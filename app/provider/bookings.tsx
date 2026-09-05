@@ -17,9 +17,11 @@ import {
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
+  Banknote,
   BriefcaseBusiness,
   CalendarDays,
   CheckCircle2,
+  ChevronRight,
   Clock3,
   CreditCard,
   MapPin,
@@ -53,7 +55,10 @@ function formatMoney(value: string | number | null | undefined) {
     return `NPR ${value ?? 0}`;
   }
 
-  return `NPR ${amount.toLocaleString()}`;
+  return `NPR ${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function formatDate(value: string) {
@@ -86,11 +91,17 @@ function getStatusClasses(status: string) {
       };
 
     case "in_progress":
-    case "travelling":
       return {
         container: "bg-[#EEF4FF]",
         text: "text-[#3563E9]",
         border: "border-[#D8E4FF]",
+      };
+
+    case "travelling":
+      return {
+        container: "bg-[#EFF6FF]",
+        text: "text-[#2563EB]",
+        border: "border-[#DBEAFE]",
       };
 
     case "arrived":
@@ -101,11 +112,17 @@ function getStatusClasses(status: string) {
       };
 
     case "accepted":
-    case "assigned":
       return {
         container: "bg-[#F3F0FF]",
         text: "text-[#6D44C5]",
         border: "border-[#E5DDFC]",
+      };
+
+    case "assigned":
+      return {
+        container: "bg-[#FFF7E6]",
+        text: "text-[#B7791F]",
+        border: "border-[#FDE7B1]",
       };
 
     case "cancelled":
@@ -117,9 +134,9 @@ function getStatusClasses(status: string) {
 
     default:
       return {
-        container: "bg-[#FFF7E6]",
-        text: "text-[#B7791F]",
-        border: "border-[#FDE7B1]",
+        container: "bg-[#F8FAFC]",
+        text: "text-[#64748B]",
+        border: "border-[#E2E8F0]",
       };
   }
 }
@@ -140,10 +157,26 @@ function getTabIcon(tab: BookingTab) {
   return XCircle;
 }
 
+function getTabAccent(tab: BookingTab) {
+  if (tab === "available") {
+    return "#3563E9";
+  }
+
+  if (tab === "active") {
+    return "#7C3AED";
+  }
+
+  if (tab === "completed") {
+    return "#159A64";
+  }
+
+  return "#DC2626";
+}
+
 export default function ProviderBookingsScreen() {
   const { width } = useWindowDimensions();
 
-  const isDesktop = width >= 1000;
+  const isDesktop = width >= 1024;
   const isTablet = width >= 700;
 
   const [selectedTab, setSelectedTab] = useState<BookingTab>("available");
@@ -157,7 +190,6 @@ export default function ProviderBookingsScreen() {
   );
 
   const [isLoading, setIsLoading] = useState(true);
-
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [processingBookingId, setProcessingBookingId] = useState<number | null>(
@@ -187,7 +219,7 @@ export default function ProviderBookingsScreen() {
       setAssignedBookings(assigned);
 
       if (refresh) {
-        setSuccessMessage("Bookings refreshed.");
+        setSuccessMessage("Bookings refreshed successfully.");
       }
     } catch (error) {
       console.error("Load provider bookings error:", error);
@@ -344,20 +376,26 @@ export default function ProviderBookingsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-[#F8FAFC]">
-        <View className="w-16 h-16 rounded-[22px] bg-white border border-[#E7ECF2] items-center justify-center">
+      <SafeAreaView className="flex-1 bg-[#F7F9FC] items-center justify-center">
+        <View className="w-[74px] h-[74px] rounded-[26px] bg-white border border-[#E7ECF2] items-center justify-center">
           <ActivityIndicator size="small" color="#159A64" />
         </View>
 
-        <Text className="mt-3 text-xs text-[#64748B]">
-          Loading provider jobs...
+        <Text className="mt-4 text-[#132F57] text-sm font-extrabold">
+          Loading jobs
+        </Text>
+
+        <Text className="mt-1 text-[#94A3B8] text-xs">
+          Checking available and active work...
         </Text>
       </SafeAreaView>
     );
   }
 
+  const currentTab = tabs.find((tab) => tab.key === selectedTab) ?? tabs[0];
+
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]">
+    <SafeAreaView className="flex-1 bg-[#F7F9FC]">
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
@@ -365,13 +403,14 @@ export default function ProviderBookingsScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={() => {
+              setSuccessMessage("");
               void loadBookings(true);
             }}
             tintColor="#159A64"
           />
         }
         contentContainerStyle={{
-          paddingBottom: 40,
+          paddingBottom: 60,
         }}
       >
         <View
@@ -392,7 +431,7 @@ export default function ProviderBookingsScreen() {
               </Pressable>
 
               <Pressable
-                className="flex-row items-center rounded-2xl bg-white border border-[#E7ECF2] px-3.5 py-3 active:opacity-70"
+                className="h-11 px-4 rounded-2xl bg-white border border-[#E7ECF2] flex-row items-center justify-center active:opacity-70"
                 disabled={isRefreshing}
                 onPress={() => {
                   setSuccessMessage("");
@@ -402,47 +441,129 @@ export default function ProviderBookingsScreen() {
                 {isRefreshing ? (
                   <ActivityIndicator size="small" color="#159A64" />
                 ) : (
-                  <RefreshCw size={16} color="#159A64" />
+                  <RefreshCw size={15} color="#159A64" />
                 )}
 
-                <Text className="ml-2 text-xs font-bold text-[#132F57]">
+                <Text className="ml-2 text-xs font-extrabold text-[#132F57]">
                   {isRefreshing ? "Refreshing" : "Refresh"}
                 </Text>
               </Pressable>
             </View>
 
-            <View className="mt-5">
-              <Text className="text-[11px] font-extrabold tracking-[1.2px] text-[#159A64]">
+            <View className="mt-6">
+              <Text className="text-[10px] font-extrabold tracking-[1.7px] text-[#159A64]">
                 PROVIDER JOBS
               </Text>
 
               <Text
                 className={`mt-1 font-extrabold text-[#132F57] ${
-                  isTablet ? "text-[30px]" : "text-[26px]"
+                  isTablet ? "text-[32px]" : "text-[27px]"
                 }`}
               >
-                Manage your work
+                Manage your bookings
               </Text>
 
-              <Text className="mt-1 text-sm text-[#64748B]">
-                Review requests, manage active jobs and track completed work.
+              <Text className="mt-2 text-sm leading-5 text-[#64748B] max-w-[630px]">
+                Discover available service requests, manage active jobs and
+                review your completed work.
               </Text>
             </View>
           </View>
 
-          {/* SUMMARY */}
-          <View className="px-5 mt-5">
+          {/* HERO SUMMARY */}
+          <View className="px-5 mt-6">
+            <View className="rounded-[30px] bg-[#102A4C] overflow-hidden p-5">
+              <View
+                className={
+                  isTablet ? "flex-row items-center justify-between" : ""
+                }
+              >
+                <View className="flex-1">
+                  <View className="self-start rounded-full bg-white/10 px-3 py-1.5 flex-row items-center">
+                    <BriefcaseBusiness size={14} color="#6EE7B7" />
+
+                    <Text className="ml-2 text-[10px] font-extrabold tracking-wide text-white">
+                      WORK OVERVIEW
+                    </Text>
+                  </View>
+
+                  <Text className="mt-4 text-white/60 text-xs font-semibold">
+                    Current work status
+                  </Text>
+
+                  <Text className="mt-1 text-white text-[28px] font-extrabold">
+                    {activeCount}{" "}
+                    {activeCount === 1 ? "active job" : "active jobs"}
+                  </Text>
+
+                  <Text className="mt-2 text-white/55 text-[10px] leading-5 max-w-[440px]">
+                    Keep your active jobs updated from accepted through
+                    travelling, arrived and completion.
+                  </Text>
+                </View>
+
+                <View className={isTablet ? "w-[340px] ml-6" : "mt-5"}>
+                  <View className="rounded-[22px] bg-white/10 border border-white/10 p-4">
+                    <View className="flex-row justify-between">
+                      <View>
+                        <Text className="text-white/55 text-[9px] font-bold">
+                          AVAILABLE
+                        </Text>
+
+                        <Text className="mt-1 text-white text-xl font-extrabold">
+                          {availableBookings.length}
+                        </Text>
+                      </View>
+
+                      <View>
+                        <Text className="text-white/55 text-[9px] font-bold">
+                          COMPLETED
+                        </Text>
+
+                        <Text className="mt-1 text-[#6EE7B7] text-xl font-extrabold">
+                          {completedCount}
+                        </Text>
+                      </View>
+
+                      <View>
+                        <Text className="text-white/55 text-[9px] font-bold">
+                          CANCELLED
+                        </Text>
+
+                        <Text className="mt-1 text-[#FDA4AF] text-xl font-extrabold">
+                          {cancelledCount}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* MAIN TAB CARDS */}
+          <View className="px-5 mt-6">
+            <Text className="text-[#132F57] text-lg font-extrabold">
+              Job categories
+            </Text>
+
+            <Text className="mt-1 text-[#94A3B8] text-[10px]">
+              Choose a category to manage your work
+            </Text>
+
             <View
               className={
                 isTablet
-                  ? "flex-row gap-3"
-                  : "flex-row flex-wrap justify-between"
+                  ? "flex-row mt-4"
+                  : "flex-row flex-wrap justify-between mt-4"
               }
             >
-              {tabs.map((tab) => {
+              {tabs.map((tab, index) => {
                 const Icon = getTabIcon(tab.key);
 
                 const isSelected = selectedTab === tab.key;
+
+                const accent = getTabAccent(tab.key);
 
                 return (
                   <Pressable
@@ -452,7 +573,7 @@ export default function ProviderBookingsScreen() {
                       setErrorMessage("");
                       setSuccessMessage("");
                     }}
-                    className={`rounded-[22px] border p-4 mb-3 active:opacity-75 ${
+                    className={`rounded-[22px] border p-4 mb-3 active:opacity-80 ${
                       isSelected
                         ? "bg-[#132F57] border-[#132F57]"
                         : "bg-white border-[#E7ECF2]"
@@ -460,6 +581,7 @@ export default function ProviderBookingsScreen() {
                     style={{
                       width: isTablet ? undefined : "48.5%",
                       flex: isTablet ? 1 : undefined,
+                      marginRight: isTablet && index < tabs.length - 1 ? 12 : 0,
                     }}
                   >
                     <View
@@ -467,18 +589,7 @@ export default function ProviderBookingsScreen() {
                         isSelected ? "bg-white/10" : "bg-[#F5F7FA]"
                       }`}
                     >
-                      <Icon
-                        size={18}
-                        color={
-                          isSelected
-                            ? "#FFFFFF"
-                            : tab.key === "completed"
-                              ? "#159A64"
-                              : tab.key === "cancelled"
-                                ? "#DC2626"
-                                : "#3563E9"
-                        }
-                      />
+                      <Icon size={18} color={isSelected ? "#FFFFFF" : accent} />
                     </View>
 
                     <Text
@@ -490,8 +601,8 @@ export default function ProviderBookingsScreen() {
                     </Text>
 
                     <Text
-                      className={`mt-1 text-[11px] font-bold ${
-                        isSelected ? "text-white/70" : "text-[#64748B]"
+                      className={`mt-1 text-[10px] font-bold ${
+                        isSelected ? "text-white/65" : "text-[#64748B]"
                       }`}
                     >
                       {tab.label}
@@ -502,16 +613,16 @@ export default function ProviderBookingsScreen() {
             </View>
           </View>
 
-          {/* CURRENT FILTER */}
+          {/* QUICK FILTER */}
           <View className="px-5 mt-1">
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{
-                gap: 8,
+                paddingRight: 5,
               }}
             >
-              {tabs.map((tab) => {
+              {tabs.map((tab, index) => {
                 const selected = selectedTab === tab.key;
 
                 return (
@@ -522,6 +633,9 @@ export default function ProviderBookingsScreen() {
                         ? "border-[#159A64] bg-[#159A64]"
                         : "border-[#E2E8F0] bg-white"
                     }`}
+                    style={{
+                      marginRight: index === tabs.length - 1 ? 0 : 8,
+                    }}
                     onPress={() => {
                       setSelectedTab(tab.key);
                       setErrorMessage("");
@@ -529,11 +643,11 @@ export default function ProviderBookingsScreen() {
                     }}
                   >
                     <Text
-                      className={`text-xs font-bold ${
+                      className={`text-[11px] font-extrabold ${
                         selected ? "text-white" : "text-[#475569]"
                       }`}
                     >
-                      {tab.label} ({tab.count})
+                      {tab.label} {tab.count}
                     </Text>
                   </Pressable>
                 );
@@ -541,10 +655,10 @@ export default function ProviderBookingsScreen() {
             </ScrollView>
           </View>
 
-          {/* MESSAGES */}
+          {/* ERROR MESSAGE */}
           {errorMessage ? (
             <View className="px-5 mt-4">
-              <View className="rounded-[20px] border border-[#FECDD3] bg-[#FFF1F2] p-4">
+              <View className="rounded-[22px] border border-[#FECDD3] bg-[#FFF1F2] p-4">
                 <View className="flex-row items-start">
                   <XCircle size={17} color="#BE123C" />
 
@@ -561,7 +675,7 @@ export default function ProviderBookingsScreen() {
                 >
                   <RefreshCw size={14} color="#BE123C" />
 
-                  <Text className="ml-2 text-xs font-bold text-[#BE123C]">
+                  <Text className="ml-2 text-xs font-extrabold text-[#BE123C]">
                     Try again
                   </Text>
                 </Pressable>
@@ -569,9 +683,10 @@ export default function ProviderBookingsScreen() {
             </View>
           ) : null}
 
+          {/* SUCCESS MESSAGE */}
           {successMessage ? (
             <View className="px-5 mt-4">
-              <View className="rounded-[20px] border border-[#CDEBD9] bg-[#EAF8F1] p-4 flex-row items-center">
+              <View className="rounded-[22px] border border-[#CDEBD9] bg-[#EAF8F1] p-4 flex-row items-center">
                 <BadgeCheck size={17} color="#159A64" />
 
                 <Text className="flex-1 ml-2 text-xs font-semibold text-[#159A64]">
@@ -588,60 +703,105 @@ export default function ProviderBookingsScreen() {
             </View>
           ) : null}
 
-          {/* CONTENT HEADER */}
+          {/* SECTION HEADER */}
           <View className="px-5 mt-7">
-            <Text className="text-[#132F57] text-xl font-extrabold">
-              {selectedTab === "available"
-                ? "Available requests"
-                : selectedTab === "active"
-                  ? "Active jobs"
-                  : selectedTab === "completed"
-                    ? "Completed jobs"
-                    : "Cancelled jobs"}
-            </Text>
+            <View className="flex-row items-end justify-between">
+              <View>
+                <Text className="text-[#132F57] text-xl font-extrabold">
+                  {selectedTab === "available"
+                    ? "Available requests"
+                    : selectedTab === "active"
+                      ? "Active jobs"
+                      : selectedTab === "completed"
+                        ? "Completed jobs"
+                        : "Cancelled jobs"}
+                </Text>
 
-            <Text className="text-[#64748B] text-xs mt-1">
-              {displayedBookings.length}{" "}
-              {displayedBookings.length === 1 ? "job" : "jobs"} in this section
-            </Text>
+                <Text className="mt-1 text-[#64748B] text-xs">
+                  {displayedBookings.length}{" "}
+                  {displayedBookings.length === 1 ? "job" : "jobs"}
+                </Text>
+              </View>
+
+              <View className="rounded-full bg-[#EEF4FF] px-3 py-1.5">
+                <Text className="text-[#3563E9] text-[10px] font-extrabold">
+                  {currentTab.label}
+                </Text>
+              </View>
+            </View>
           </View>
 
-          {/* EMPTY */}
+          {/* EMPTY STATE */}
           {displayedBookings.length === 0 ? (
             <View className="px-5 mt-4">
-              <View className="items-center rounded-[28px] border border-[#E7ECF2] bg-white px-6 py-12">
-                <View className="w-20 h-20 rounded-[26px] bg-[#F5F7FA] items-center justify-center">
-                  <BriefcaseBusiness size={30} color="#94A3B8" />
+              <View className="items-center rounded-[28px] border border-[#E7ECF2] bg-white px-6 py-14">
+                <View className="w-[72px] h-[72px] rounded-[26px] bg-[#F5F7FA] items-center justify-center">
+                  {selectedTab === "available" ? (
+                    <Sparkles size={28} color="#94A3B8" />
+                  ) : selectedTab === "completed" ? (
+                    <CheckCircle2 size={28} color="#94A3B8" />
+                  ) : selectedTab === "cancelled" ? (
+                    <XCircle size={28} color="#94A3B8" />
+                  ) : (
+                    <BriefcaseBusiness size={28} color="#94A3B8" />
+                  )}
                 </View>
 
                 <Text className="mt-5 text-lg font-extrabold text-[#132F57]">
-                  No bookings found
+                  {selectedTab === "available"
+                    ? "No requests available"
+                    : selectedTab === "active"
+                      ? "No active jobs"
+                      : selectedTab === "completed"
+                        ? "No completed jobs"
+                        : "No cancelled jobs"}
                 </Text>
 
-                <Text className="mt-2 text-center text-xs leading-5 text-[#64748B] max-w-[290px]">
+                <Text className="mt-2 text-center text-xs leading-5 text-[#64748B] max-w-[320px]">
                   {selectedTab === "available"
-                    ? "No matching service requests are currently available."
-                    : `You have no ${selectedTab} jobs.`}
+                    ? "New service requests that match your profile will appear here."
+                    : selectedTab === "active"
+                      ? "Jobs you accept or receive will appear here while they are active."
+                      : selectedTab === "completed"
+                        ? "Finished service jobs will appear here."
+                        : "Cancelled jobs will appear here for your records."}
                 </Text>
+
+                <Pressable
+                  className="mt-5 flex-row items-center rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] px-4 py-3 active:opacity-70"
+                  onPress={() => {
+                    void loadBookings(true);
+                  }}
+                >
+                  <RefreshCw size={14} color="#64748B" />
+
+                  <Text className="ml-2 text-xs font-bold text-[#475569]">
+                    Refresh jobs
+                  </Text>
+                </Pressable>
               </View>
             </View>
           ) : (
             <View
               className={
-                isDesktop ? "flex-row flex-wrap px-5 mt-4 gap-4" : "px-5 mt-4"
+                isDesktop ? "flex-row flex-wrap px-5 mt-4" : "px-5 mt-4"
               }
             >
-              {displayedBookings.map((booking) => {
+              {displayedBookings.map((booking, index) => {
                 const statusStyle = getStatusClasses(booking.status);
 
                 const isProcessing = processingBookingId === booking.id;
+
+                const servicePrice =
+                  booking.final_price ?? booking.estimated_price;
 
                 return (
                   <Pressable
                     key={booking.id}
                     className="rounded-[26px] border border-[#E7ECF2] bg-white mb-4 overflow-hidden active:opacity-80"
                     style={{
-                      width: isDesktop ? "48.9%" : "100%",
+                      width: isDesktop ? "49%" : "100%",
+                      marginRight: isDesktop && index % 2 === 0 ? "2%" : 0,
                     }}
                     onPress={() =>
                       router.push({
@@ -653,22 +813,42 @@ export default function ProviderBookingsScreen() {
                     }
                     disabled={isProcessing}
                   >
-                    {/* CARD HEADER */}
+                    {/* TOP ACCENT */}
+                    <View
+                      className={`h-1 ${
+                        booking.status === "completed"
+                          ? "bg-[#159A64]"
+                          : booking.status === "cancelled"
+                            ? "bg-[#DC2626]"
+                            : booking.status === "in_progress"
+                              ? "bg-[#3563E9]"
+                              : "bg-[#132F57]"
+                      }`}
+                    />
+
                     <View className="p-5">
+                      {/* TITLE */}
                       <View className="flex-row items-start justify-between">
                         <View className="flex-1 pr-3">
-                          <Text className="text-[10px] font-extrabold tracking-wide text-[#94A3B8]">
-                            JOB #{booking.id}
-                          </Text>
+                          <View className="flex-row items-center">
+                            <Text className="text-[9px] font-extrabold tracking-[1px] text-[#94A3B8]">
+                              JOB #{booking.id}
+                            </Text>
+                          </View>
 
-                          <Text className="mt-1 text-lg font-extrabold text-[#132F57]">
+                          <Text className="mt-1 text-[17px] font-extrabold text-[#132F57]">
                             {booking.services.name}
                           </Text>
 
                           <View className="flex-row items-center mt-2">
-                            <UserRound size={14} color="#64748B" />
+                            <View className="w-7 h-7 rounded-xl bg-[#F5F7FA] items-center justify-center">
+                              <UserRound size={13} color="#64748B" />
+                            </View>
 
-                            <Text className="ml-1.5 text-xs font-semibold text-[#64748B]">
+                            <Text
+                              numberOfLines={1}
+                              className="ml-2 text-xs font-semibold text-[#64748B] flex-1"
+                            >
                               {
                                 booking.users_bookings_customer_idTousers
                                   .full_name
@@ -678,7 +858,7 @@ export default function ProviderBookingsScreen() {
                         </View>
 
                         <View
-                          className={`rounded-full border px-2.5 py-1 ${statusStyle.container} ${statusStyle.border}`}
+                          className={`rounded-full border px-2.5 py-1.5 ${statusStyle.container} ${statusStyle.border}`}
                         >
                           <Text
                             className={`text-[9px] font-extrabold ${statusStyle.text}`}
@@ -688,19 +868,26 @@ export default function ProviderBookingsScreen() {
                         </View>
                       </View>
 
-                      {/* JOB INFO */}
-                      <View className="mt-4 rounded-2xl bg-[#F8FAFC] border border-[#EEF2F6] p-4">
+                      {/* LOCATION */}
+                      <View className="mt-5 rounded-[20px] bg-[#F8FAFC] border border-[#EEF2F6] p-4">
                         <View className="flex-row items-start">
                           <View className="w-9 h-9 rounded-xl bg-white items-center justify-center">
                             <MapPin size={16} color="#FF5A3C" />
                           </View>
 
-                          <View className="flex-1 ml-3">
-                            <Text className="text-xs font-bold text-[#132F57]">
+                          <View className="ml-3 flex-1">
+                            <Text className="text-[10px] text-[#94A3B8] font-bold">
+                              SERVICE LOCATION
+                            </Text>
+
+                            <Text className="mt-1 text-xs font-extrabold text-[#132F57]">
                               {booking.service_area}
                             </Text>
 
-                            <Text className="mt-1 text-[11px] leading-5 text-[#64748B]">
+                            <Text
+                              numberOfLines={2}
+                              className="mt-1 text-[10px] leading-4 text-[#64748B]"
+                            >
                               {booking.service_address}
                             </Text>
                           </View>
@@ -711,28 +898,34 @@ export default function ProviderBookingsScreen() {
                         <View className="flex-row items-center">
                           <CalendarDays size={14} color="#64748B" />
 
-                          <Text className="ml-2 text-[11px] text-[#64748B]">
-                            Preferred: {formatDate(booking.preferred_date)}
+                          <Text className="ml-2 text-[10px] text-[#64748B]">
+                            Preferred date
+                          </Text>
+
+                          <Text className="ml-auto text-[10px] font-extrabold text-[#132F57]">
+                            {formatDate(booking.preferred_date)}
                           </Text>
                         </View>
                       </View>
 
-                      {/* PAYMENT / PRICE */}
+                      {/* PRICE + PAYMENT */}
                       <View className="mt-4 flex-row items-center justify-between">
                         <View>
-                          <Text className="text-[10px] text-[#94A3B8]">
-                            Service value
+                          <Text className="text-[9px] font-bold text-[#94A3B8]">
+                            SERVICE VALUE
                           </Text>
 
-                          <Text className="mt-0.5 text-lg font-extrabold text-[#159A64]">
-                            {formatMoney(
-                              booking.final_price ?? booking.estimated_price,
-                            )}
-                          </Text>
+                          <View className="mt-1 flex-row items-center">
+                            <Banknote size={16} color="#159A64" />
+
+                            <Text className="ml-1.5 text-lg font-extrabold text-[#159A64]">
+                              {formatMoney(servicePrice)}
+                            </Text>
+                          </View>
                         </View>
 
                         <View
-                          className={`rounded-full px-2.5 py-1.5 ${
+                          className={`rounded-2xl px-3 py-2 ${
                             booking.payment_method === "cash"
                               ? "bg-[#FFF7E6]"
                               : "bg-[#EEF4FF]"
@@ -740,7 +933,7 @@ export default function ProviderBookingsScreen() {
                         >
                           <View className="flex-row items-center">
                             <CreditCard
-                              size={12}
+                              size={13}
                               color={
                                 booking.payment_method === "cash"
                                   ? "#B7791F"
@@ -749,7 +942,7 @@ export default function ProviderBookingsScreen() {
                             />
 
                             <Text
-                              className={`ml-1 text-[9px] font-extrabold ${
+                              className={`ml-1.5 text-[9px] font-extrabold ${
                                 booking.payment_method === "cash"
                                   ? "text-[#B7791F]"
                                   : "text-[#3563E9]"
@@ -763,20 +956,24 @@ export default function ProviderBookingsScreen() {
 
                       {/* VIEW DETAILS */}
                       <View className="mt-4 pt-4 border-t border-[#EEF2F6] flex-row items-center justify-between">
-                        <Text className="text-[10px] text-[#64748B]">
-                          Tap to open full job details
-                        </Text>
+                        <View className="flex-row items-center">
+                          <Clock3 size={12} color="#94A3B8" />
+
+                          <Text className="ml-1.5 text-[9px] text-[#94A3B8]">
+                            Open for full details
+                          </Text>
+                        </View>
 
                         <View className="flex-row items-center">
-                          <Text className="text-xs font-bold text-[#159A64]">
-                            View details
+                          <Text className="text-[11px] font-extrabold text-[#159A64]">
+                            View job
                           </Text>
 
-                          <ArrowRight
-                            size={14}
+                          <ChevronRight
+                            size={15}
                             color="#159A64"
                             style={{
-                              marginLeft: 5,
+                              marginLeft: 3,
                             }}
                           />
                         </View>
@@ -784,9 +981,12 @@ export default function ProviderBookingsScreen() {
 
                       {/* AVAILABLE ACTIONS */}
                       {selectedTab === "available" ? (
-                        <View className="mt-5 flex-row gap-3">
+                        <View className="mt-5 flex-row">
                           <Pressable
                             className="flex-1 items-center justify-center rounded-2xl bg-[#159A64] py-4 active:opacity-80"
+                            style={{
+                              marginRight: 10,
+                            }}
                             onPress={(event) => {
                               event.stopPropagation();
 
@@ -795,13 +995,13 @@ export default function ProviderBookingsScreen() {
                             disabled={isProcessing}
                           >
                             {isProcessing ? (
-                              <ActivityIndicator color="#FFFFFF" />
+                              <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                               <View className="flex-row items-center">
                                 <CheckCircle2 size={16} color="#FFFFFF" />
 
-                                <Text className="ml-2 font-bold text-white text-sm">
-                                  Accept
+                                <Text className="ml-2 font-extrabold text-white text-xs">
+                                  Accept job
                                 </Text>
                               </View>
                             )}
@@ -816,12 +1016,36 @@ export default function ProviderBookingsScreen() {
                             }}
                             disabled={isProcessing}
                           >
-                            <Text className="font-bold text-[#475569] text-sm">
-                              Dismiss
-                            </Text>
+                            <View className="flex-row items-center">
+                              <XCircle size={15} color="#64748B" />
+
+                              <Text className="ml-2 font-extrabold text-[#475569] text-xs">
+                                Dismiss
+                              </Text>
+                            </View>
                           </Pressable>
                         </View>
-                      ) : null}
+                      ) : (
+                        <Pressable
+                          className="mt-4 rounded-2xl bg-[#F8FAFC] border border-[#EEF2F6] px-4 py-3.5 flex-row items-center justify-between active:opacity-70"
+                          onPress={(event) => {
+                            event.stopPropagation();
+
+                            router.push({
+                              pathname: "/provider/booking/[id]",
+                              params: {
+                                id: String(booking.id),
+                              },
+                            });
+                          }}
+                        >
+                          <Text className="text-[#132F57] text-xs font-bold">
+                            Manage job
+                          </Text>
+
+                          <ArrowRight size={15} color="#159A64" />
+                        </Pressable>
+                      )}
                     </View>
                   </Pressable>
                 );
