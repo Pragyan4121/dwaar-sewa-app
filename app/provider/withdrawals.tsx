@@ -445,25 +445,15 @@ export default function ProviderWithdrawalsScreen() {
                       </Text>
 
                       <Text className="text-white text-xs font-bold">
-                        {walletIsNegative
-                          ? "Commission balance due"
-                          : hasPositiveBalance
-                            ? "Ready to request payout"
-                            : "No withdrawable balance"}
+                        {hasPositiveBalance
+                          ? "Ready to request payout"
+                          : "No withdrawable balance"}
                       </Text>
 
-                      {walletIsNegative ? (
-                        <Text className="mt-2 text-[#FCA5A5] text-xl font-extrabold">
-                          {formatMoney(Math.abs(walletBalance))}
-                        </Text>
-                      ) : null}
-
                       <Text className="mt-2 text-[10px] leading-5 text-white/65">
-                        {walletIsNegative
-                          ? "This amount is commission from cash bookings and will automatically settle from future online-paid earnings."
-                          : hasPositiveBalance
-                            ? "You can submit a bank-transfer withdrawal request using the form below."
-                            : "Complete eligible jobs to build a positive provider wallet balance."}
+                        {hasPositiveBalance
+                          ? "You can submit a bank-transfer withdrawal request using the form below."
+                          : "Complete eligible jobs to build a positive provider wallet balance."}
                       </Text>
                     </View>
                   </View>
@@ -701,11 +691,8 @@ export default function ProviderWithdrawalsScreen() {
                       <ShieldCheck size={16} color="#64748B" />
 
                       <Text className="flex-1 ml-2 text-[#64748B] text-[10px] leading-5">
-                        {walletIsNegative
-                          ? `You owe Dwaar Sewa ${formatMoney(
-                              Math.abs(walletBalance),
-                            )} in cash-booking commission. This must clear before you can withdraw.`
-                          : "You need a positive wallet balance before requesting a withdrawal."}
+                        "You need a positive wallet balance before requesting a
+                        withdrawal."
                       </Text>
                     </View>
                   ) : null}

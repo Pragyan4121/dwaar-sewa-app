@@ -243,36 +243,30 @@ export default function ProviderEarningsScreen() {
                   </View>
 
                   <Text className="mt-4 text-xs font-semibold text-white/60">
-                    {walletIsNegative
-                      ? "You Owe Dwaar Sewa"
-                      : "Available Wallet Balance"}
+                    Available Wallet Balance
                   </Text>
 
-                  <Text
-                    className={`mt-1 text-[30px] font-extrabold ${
-                      walletIsNegative ? "text-[#FCA5A5]" : "text-white"
-                    }`}
-                  >
-                    {formatMoney(Math.abs(walletBalance))}
+                  <Text className="mt-1 text-[30px] font-extrabold text-white">
+                    {formatMoney(Math.max(walletBalance, 0))}
                   </Text>
 
                   <Text className="mt-1 text-[10px] text-white/50">
-                    Currency: {summary?.wallet.currency ?? "NPR"}
+                    Available for withdrawal
                   </Text>
                 </View>
 
                 <View className={isTablet ? "w-[330px] ml-6" : "mt-5"}>
                   <View className="bg-white/10 rounded-[20px] p-4">
                     <Text className="text-white text-xs font-bold">
-                      {walletIsNegative
-                        ? "Commission balance due"
-                        : "Ready for withdrawal"}
+                      {walletBalance > 0
+                        ? "Ready for withdrawal"
+                        : "No withdrawable balance"}
                     </Text>
 
                     <Text className="mt-1 text-[10px] leading-5 text-white/65">
-                      {walletIsNegative
-                        ? "This amount comes from commission on cash bookings and will automatically settle from future online earnings."
-                        : "Your current wallet balance can be used for eligible withdrawal requests."}
+                      {walletBalance > 0
+                        ? "Your current wallet balance can be used for eligible withdrawal requests."
+                        : "Complete eligible jobs to build your available wallet balance."}
                     </Text>
                   </View>
                 </View>
