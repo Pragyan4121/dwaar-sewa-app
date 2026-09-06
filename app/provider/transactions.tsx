@@ -32,7 +32,10 @@ import {
   WalletCards,
 } from "lucide-react-native";
 
-import { getProviderWalletTransactions } from "@/api/provider-earnings";
+import {
+  getProviderWalletTransactions,
+  getProviderWithdrawals,
+} from "@/api/provider-earnings";
 
 import type { ProviderWalletSummary, ProviderWalletTransaction } from "@/types";
 
@@ -97,6 +100,8 @@ export default function ProviderTransactionsScreen() {
     [],
   );
 
+  const [pendingWithdrawalAmount, setPendingWithdrawalAmount] = useState(0);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -111,10 +116,22 @@ export default function ProviderTransactionsScreen() {
 
       setErrorMessage("");
 
-      const result = await getProviderWalletTransactions(1, 50);
+      const [walletResult, withdrawalsResult] = await Promise.all([
+        getProviderWalletTransactions(1, 50),
+        getProviderWithdrawals(1, 100),
+      ]);
 
-      setWallet(result.wallet);
-      setTransactions(result.transactions);
+      setWallet(walletResult.wallet);
+      setTransactions(walletResult.transactions);
+
+      const pendingAmount = withdrawalsResult.withdrawals
+        .filter(
+          (withdrawal) =>
+            withdrawal.status === "pending" || withdrawal.status === "approved",
+        )
+        .reduce((sum, withdrawal) => sum + Number(withdrawal.amount ?? 0), 0);
+
+      setPendingWithdrawalAmount(Math.round(pendingAmount * 100) / 100);
     } catch (error) {
       console.error("Load provider transactions error:", error);
 
@@ -279,6 +296,34 @@ export default function ProviderTransactionsScreen() {
                       {formatMoney(Math.abs(walletBalance))}
                     </Text>
 
+                    {!walletIsNegative && pendingWithdrawalAmount > 0 ? (
+                      <View className="mt-5 rounded-[18px] bg-white/10 border border-white/10 px-4 py-3">
+                        <View className="flex-row items-center justify-between">
+                          <View>
+                            <Text className="text-white/55 text-[9px] font-extrabold tracking-[0.8px]">
+                              PENDING WITHDRAWAL
+                            </Text>
+
+                            <Text className="mt-1 text-white text-base font-extrabold">
+                              {formatMoney(pendingWithdrawalAmount)}
+                            </Text>
+                          </View>
+
+                          <View className="rounded-full bg-[#F59E0B]/20 px-3 py-1.5">
+                            <Text className="text-[#FDE68A] text-[9px] font-extrabold">
+                              RESERVED
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text className="mt-2 text-white/50 text-[10px] leading-4">
+                          This amount has already been deducted from your
+                          available balance while the withdrawal is being
+                          processed.
+                        </Text>
+                      </View>
+                    ) : null}
+
                     <View className="mt-3 flex-row items-center">
                       <View
                         className={`rounded-full px-3 py-1.5 ${
@@ -315,13 +360,19 @@ export default function ProviderTransactionsScreen() {
                           <Text className="text-white text-xs font-extrabold">
                             {walletIsNegative
                               ? "Commission balance due"
-                              : "Your wallet is healthy"}
+                              : pendingWithdrawalAmount > 0
+                                ? "Withdrawal in progress"
+                                : "Your wallet is healthy"}
                           </Text>
 
                           <Text className="mt-1 text-white/60 text-[10px] leading-5">
                             {walletIsNegative
                               ? "Cash booking commissions can create a negative balance. Future eligible earnings may offset the amount."
-                              : "Your current wallet balance is positive. Withdraw available earnings whenever eligible."}
+                              : pendingWithdrawalAmount > 0
+                                ? `${formatMoney(
+                                    pendingWithdrawalAmount,
+                                  )} is currently reserved for your pending withdrawal request.`
+                                : "Your current wallet balance is positive. Withdraw available earnings whenever eligible."}
                           </Text>
                         </View>
                       </View>
