@@ -422,21 +422,15 @@ export default function ProviderWithdrawalsScreen() {
                     </View>
 
                     <Text className="mt-4 text-xs font-semibold text-white/60">
-                      {walletIsNegative
-                        ? "You Owe Dwaar Sewa"
-                        : "Available Balance"}
+                      Your Balance
                     </Text>
 
-                    <Text
-                      className={`mt-1 text-[30px] font-extrabold ${
-                        walletIsNegative ? "text-[#FCA5A5]" : "text-white"
-                      }`}
-                    >
-                      {formatMoney(Math.abs(walletBalance))}
+                    <Text className="mt-1 text-[30px] font-extrabold text-white">
+                      {formatMoney(Math.max(walletBalance, 0))}
                     </Text>
 
                     <Text className="mt-1 text-[10px] text-white/50">
-                      {wallet?.currency ?? "NPR"}
+                      Available for withdrawal
                     </Text>
                   </View>
 
@@ -450,7 +444,21 @@ export default function ProviderWithdrawalsScreen() {
                             : "No withdrawable balance"}
                       </Text>
 
-                      <Text className="mt-1 text-[10px] leading-5 text-white/65">
+                      <Text className="text-white text-xs font-bold">
+                        {walletIsNegative
+                          ? "Commission balance due"
+                          : hasPositiveBalance
+                            ? "Ready to request payout"
+                            : "No withdrawable balance"}
+                      </Text>
+
+                      {walletIsNegative ? (
+                        <Text className="mt-2 text-[#FCA5A5] text-xl font-extrabold">
+                          {formatMoney(Math.abs(walletBalance))}
+                        </Text>
+                      ) : null}
+
+                      <Text className="mt-2 text-[10px] leading-5 text-white/65">
                         {walletIsNegative
                           ? "This amount is commission from cash bookings and will automatically settle from future online-paid earnings."
                           : hasPositiveBalance
