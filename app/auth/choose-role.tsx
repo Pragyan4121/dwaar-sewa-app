@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { safeBack } from "@/utils/navigation";
 
 export default function ChooseRoleScreen() {
   const router = useRouter();
@@ -54,7 +55,7 @@ export default function ChooseRoleScreen() {
             <View className="flex-1 justify-between p-6">
               <View>
                 <Pressable
-                  onPress={() => router.back()}
+                  onPress={() => safeBack(router, "/")}
                   className="h-11 w-11 items-center justify-center rounded-2xl bg-white/10 active:opacity-70"
                 >
                   <ArrowLeft size={19} color="#FFFFFF" />
@@ -237,7 +238,7 @@ export default function ChooseRoleScreen() {
               </View>
 
               <Pressable
-                onPress={() => router.back()}
+                onPress={() => safeBack(router, "/")}
                 className="mt-4 items-center py-2 active:opacity-70"
               >
                 <Text className="text-xs font-semibold text-[#94A3B8]">

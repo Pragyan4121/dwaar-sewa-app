@@ -2,6 +2,7 @@ import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
+import { safeBack } from "@/utils/navigation";
 
 import {
   ActivityIndicator,
@@ -383,7 +384,7 @@ export default function ProviderEditProfileScreen() {
               <View className="flex-row items-center justify-between">
                 <Pressable
                   className="h-11 w-11 items-center justify-center rounded-2xl border border-[#E7ECF2] bg-white active:opacity-70"
-                  onPress={() => router.back()}
+                  onPress={() => safeBack(router, "/provider/profile")}
                   disabled={isSubmitting}
                 >
                   <ArrowLeft size={19} color="#132F57" />
@@ -391,7 +392,7 @@ export default function ProviderEditProfileScreen() {
 
                 <Pressable
                   className="flex-row items-center rounded-2xl border border-[#E7ECF2] bg-white px-4 py-3 active:opacity-70"
-                  onPress={() => router.back()}
+                  onPress={() => safeBack(router, "/provider/profile")}
                   disabled={isSubmitting}
                 >
                   <X size={15} color="#64748B" />
@@ -967,7 +968,7 @@ export default function ProviderEditProfileScreen() {
 
                 <Pressable
                   className="mt-3 flex-row items-center justify-center rounded-[20px] border border-[#E2E8F0] bg-white py-4 active:opacity-70"
-                  onPress={() => router.back()}
+                  onPress={() => safeBack(router, "/provider/profile")}
                   disabled={isSubmitting}
                 >
                   <X size={15} color="#64748B" />

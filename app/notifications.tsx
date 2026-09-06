@@ -37,6 +37,7 @@ import {
 } from "@/api/notifications";
 
 import { useProviderAuth } from "@/context/ProviderAuthContext";
+import { safeBack } from "@/utils/navigation";
 
 interface ApiErrorResponse {
   message?: string;
@@ -400,7 +401,7 @@ export default function NotificationsScreen() {
           <View className="flex-row items-center justify-between">
             <Pressable
               className="h-11 w-11 items-center justify-center rounded-2xl border border-[#E7ECF2] bg-white active:opacity-70"
-              onPress={() => router.back()}
+              onPress={() => safeBack(router, "/(tabs)")}
             >
               <ArrowLeft size={19} color="#132F57" />
             </Pressable>

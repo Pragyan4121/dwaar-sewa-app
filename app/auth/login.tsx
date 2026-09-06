@@ -28,6 +28,7 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 import { useProviderAuth } from "@/context/ProviderAuthContext";
+import { safeBack } from "@/utils/navigation";
 
 type LoginRole = "customer" | "provider";
 
@@ -122,7 +123,7 @@ export default function LoginScreen() {
                 <View>
                   <Pressable
                     className="h-11 w-11 items-center justify-center rounded-2xl bg-white/10 active:opacity-70"
-                    onPress={() => router.back()}
+                    onPress={() => safeBack(router, "/auth/choose-role")}
                     disabled={loading}
                   >
                     <ArrowLeft size={19} color="#FFFFFF" />
@@ -466,7 +467,7 @@ export default function LoginScreen() {
                 </View>
 
                 <Pressable
-                  onPress={() => router.back()}
+                  onPress={() => safeBack(router, "/auth/choose-role")}
                   disabled={loading}
                   className="mt-4 items-center py-2 active:opacity-70"
                 >

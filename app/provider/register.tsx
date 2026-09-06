@@ -1,6 +1,7 @@
 import axios from "axios";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
+import { safeBack } from "@/utils/navigation";
 
 import {
   ActivityIndicator,
@@ -355,7 +356,7 @@ export default function ProviderRegisterScreen() {
             <View className="flex-row items-center justify-between">
               <Pressable
                 className="h-11 w-11 items-center justify-center rounded-2xl border border-[#E7ECF2] bg-white active:opacity-70"
-                onPress={() => router.back()}
+                onPress={() => safeBack(router, "/provider/login")}
                 disabled={isSubmitting}
               >
                 <ArrowLeft size={19} color="#132F57" />

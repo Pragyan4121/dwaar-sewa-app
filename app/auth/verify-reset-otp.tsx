@@ -1,6 +1,7 @@
 import axios from "axios";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
+import { safeBack } from "@/utils/navigation";
 
 import {
   ActivityIndicator,
@@ -270,7 +271,7 @@ export default function CustomerVerifyResetOtpScreen() {
                 <View>
                   <Pressable
                     className="h-11 w-11 items-center justify-center rounded-2xl bg-white/10 active:opacity-70"
-                    onPress={() => router.back()}
+                    onPress={() => safeBack(router, "/auth/forgot-password")}
                     disabled={isVerifying || isResending}
                   >
                     <ArrowLeft size={19} color="#FFFFFF" />

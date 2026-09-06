@@ -41,6 +41,7 @@ import {
 } from "@/api/provider-earnings";
 
 import type { ProviderWithdrawal, ProviderWalletSummary } from "@/types";
+import { safeBack } from "@/utils/navigation";
 
 interface ApiErrorResponse {
   message?: string;
@@ -360,7 +361,7 @@ export default function ProviderWithdrawalsScreen() {
               <View className="flex-row items-center justify-between">
                 <Pressable
                   className="w-11 h-11 rounded-2xl bg-white border border-[#E7ECF2] items-center justify-center active:opacity-70"
-                  onPress={() => router.back()}
+                  onPress={() => safeBack(router, "/provider")}
                 >
                   <ArrowLeft size={19} color="#132F57" />
                 </Pressable>

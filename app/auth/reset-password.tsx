@@ -32,6 +32,7 @@ import {
 } from "lucide-react-native";
 
 import { resetCustomerPassword } from "@/api/customer-auth";
+import { safeBack } from "@/utils/navigation";
 
 interface ApiErrorResponse {
   message?: string;
@@ -254,7 +255,7 @@ export default function CustomerResetPasswordScreen() {
                 <View>
                   <Pressable
                     className="h-11 w-11 items-center justify-center rounded-2xl bg-white/10 active:opacity-70"
-                    onPress={() => router.back()}
+                    onPress={() => safeBack(router, "/auth/login")}
                     disabled={isSubmitting}
                   >
                     <ArrowLeft size={19} color="#FFFFFF" />

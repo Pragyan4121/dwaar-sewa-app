@@ -30,6 +30,7 @@ import {
 } from "lucide-react-native";
 
 import { useAuth } from "@/context/AuthContext";
+import { safeBack } from "@/utils/navigation";
 
 const NEPAL_PHONE_REGEX = /^9(7|8)\d{8}$/;
 
@@ -159,7 +160,7 @@ export default function RegisterScreen() {
     try {
       await register(fullName, phone, password, email || undefined);
 
-      router.back();
+      safeBack(router, "/auth/login");
     } catch (err: any) {
       setError(
         err?.response?.data?.message ??
@@ -204,7 +205,7 @@ export default function RegisterScreen() {
               <View className="flex-1 justify-between p-6">
                 <View>
                   <Pressable
-                    onPress={() => router.back()}
+                    onPress={() => safeBack(router, "/auth/login")}
                     disabled={loading}
                     className="h-11 w-11 items-center justify-center rounded-2xl bg-white/10 active:opacity-70"
                   >

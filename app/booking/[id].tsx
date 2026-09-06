@@ -41,6 +41,8 @@ import type {
   PaymentMethod,
 } from "@/types";
 
+import { safeBack } from "@/utils/navigation";
+
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "Cash",
   esewa: "eSewa",
@@ -384,7 +386,7 @@ export default function BookingDetailScreen() {
         <View className="px-5 pt-4">
           <View className="flex-row items-center justify-between">
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => safeBack(router, "/(tabs)/bookings")}
               className="w-11 h-11 rounded-2xl bg-white border border-[#E7ECF2] items-center justify-center active:opacity-70"
             >
               <ArrowLeft size={20} color="#132F57" />
