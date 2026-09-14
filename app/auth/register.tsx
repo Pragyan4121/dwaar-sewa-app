@@ -459,6 +459,7 @@ export default function RegisterScreen() {
                           setError(null);
                         }
                       }}
+                      maxLength={24}
                       onFocus={() => setPasswordFocused(true)}
                       secureTextEntry={!showPassword}
                       placeholder="Create a strong password"
@@ -541,6 +542,7 @@ export default function RegisterScreen() {
                         setError(null);
                       }
                     }}
+                    maxLength={24}
                     secureTextEntry={!showPassword}
                     placeholder="Re-enter your password"
                     placeholderTextColor="#94A3B8"

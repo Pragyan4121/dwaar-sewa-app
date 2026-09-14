@@ -133,8 +133,10 @@ export interface Wallet {
   id: number;
   user_id: number;
   balance: string;
+  commission_due: string;
   currency: string;
   is_active: boolean;
+  amount_owed_to_platform?: string;
 }
 export interface ProviderUser {
   id: number;

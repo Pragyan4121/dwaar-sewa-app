@@ -667,6 +667,7 @@ export default function ProviderRegisterScreen() {
                           setPassword(value);
                           updateFieldError("password");
                         }}
+                        maxLength={24}
                         placeholder="Minimum 8 characters"
                         placeholderTextColor="#94A3B8"
                         secureTextEntry={!showPassword}
@@ -706,6 +707,7 @@ export default function ProviderRegisterScreen() {
                         setConfirmPassword(value);
                         updateFieldError("confirmPassword");
                       }}
+                      maxLength={24}
                       placeholder="Re-enter your password"
                       placeholderTextColor="#94A3B8"
                       secureTextEntry={!showPassword}

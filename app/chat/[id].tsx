@@ -103,6 +103,12 @@ interface ChatPayload {
   provider: ChatParticipant | null;
 }
 
+interface QuickReply {
+  id: string | number;
+  label: string;
+  text: string;
+}
+
 interface ApiErrorResponse {
   message?: string;
   code?: string;
@@ -298,6 +304,10 @@ export default function CustomerChatScreen() {
 
   const [messageText, setMessageText] = useState("");
 
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
+
+  const [quickRepliesVisible, setQuickRepliesVisible] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
 
   const [isSending, setIsSending] = useState(false);
@@ -405,9 +415,81 @@ export default function CustomerChatScreen() {
     }
   }, [bookingId]);
 
+  const loadQuickReplies = useCallback(async () => {
+    try {
+      const { data } = await api.get("/chats/quick-replies");
+
+      const source =
+        data && typeof data === "object"
+          ? (data as Record<string, unknown>)
+          : {};
+
+      const rawReplies = Array.isArray(source.quick_replies)
+        ? source.quick_replies
+        : Array.isArray(source.quickReplies)
+          ? source.quickReplies
+          : Array.isArray(source.replies)
+            ? source.replies
+            : Array.isArray(data)
+              ? data
+              : [];
+
+      const parsedReplies = rawReplies
+        .map((item, index) => {
+          if (typeof item === "string") {
+            return {
+              id: index,
+              label: item,
+              text: item,
+            };
+          }
+
+          if (!item || typeof item !== "object") {
+            return null;
+          }
+
+          const record = item as Record<string, unknown>;
+
+          const text =
+            typeof record.message === "string"
+              ? record.message
+              : typeof record.text === "string"
+                ? record.text
+                : null;
+
+          if (!text?.trim()) {
+            return null;
+          }
+
+          const normalizedText = text.trim();
+
+          return {
+            id:
+              typeof record.id === "string" || typeof record.id === "number"
+                ? record.id
+                : index,
+
+            label:
+              typeof record.label === "string" && record.label.trim()
+                ? record.label.trim()
+                : normalizedText,
+
+            text: normalizedText,
+          };
+        })
+        .filter((item): item is QuickReply => item !== null);
+
+      setQuickReplies(parsedReplies);
+    } catch (error) {
+      console.warn("Unable to load customer quick replies:", error);
+      setQuickReplies([]);
+    }
+  }, []);
+
   useEffect(() => {
     void loadChat();
-  }, [loadChat]);
+    void loadQuickReplies();
+  }, [loadChat, loadQuickReplies]);
 
   useEffect(() => {
     if (!Number.isInteger(bookingId) || bookingId <= 0) {
@@ -1197,6 +1279,67 @@ export default function CustomerChatScreen() {
 
         {isActive ? (
           <View className="border-t border-gray-200 bg-white px-3 py-3">
+            {/* Compact Quick Replies */}
+            {quickReplies.length > 0 ? (
+              <View className="mb-2">
+                <Pressable
+                  className="self-start flex-row items-center rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 active:opacity-70"
+                  onPress={() => {
+                    setQuickRepliesVisible((current) => !current);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Quick Replies"
+                >
+                  <Text className="text-xs font-bold text-primary">
+                    Quick Replies
+                  </Text>
+
+                  <Text className="ml-2 text-xs font-bold text-primary">
+                    {quickRepliesVisible ? "▲" : "▼"}
+                  </Text>
+                </Pressable>
+
+                {quickRepliesVisible ? (
+                  <View className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-2">
+                    <FlatList
+                      horizontal
+                      data={quickReplies}
+                      keyExtractor={(item) => String(item.id)}
+                      showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                      contentContainerStyle={{
+                        paddingRight: 4,
+                      }}
+                      renderItem={({ item }) => (
+                        <Pressable
+                          className="mr-2 max-w-[240px] rounded-xl border border-orange-200 bg-white px-3 py-2 active:opacity-70"
+                          onPress={() => {
+                            setMessageText(item.text);
+                            setQuickRepliesVisible(false);
+                          }}
+                        >
+                          <Text
+                            className="text-xs font-bold text-primary"
+                            numberOfLines={1}
+                          >
+                            {item.label}
+                          </Text>
+
+                          <Text
+                            className="mt-1 text-[10px] leading-4 text-gray-500"
+                            numberOfLines={2}
+                          >
+                            {item.text}
+                          </Text>
+                        </Pressable>
+                      )}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {/* Input + Send */}
             <View className="flex-row items-end">
               <TextInput
                 className="mr-2 max-h-28 min-h-12 flex-1 rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-base text-gray-900"

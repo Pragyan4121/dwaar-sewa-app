@@ -151,7 +151,7 @@ export default function ProviderEarningsScreen() {
 
   const walletBalance = Number(summary?.wallet.balance ?? 0);
 
-  const walletIsNegative = walletBalance < 0;
+  const amountOwed = Number(summary?.wallet.amount_owed_to_platform ?? 0);
 
   return (
     <SafeAreaView className="flex-1 bg-[#F8FAFC]">
@@ -250,11 +250,27 @@ export default function ProviderEarningsScreen() {
                   <Text className="mt-1 text-[30px] font-extrabold text-white">
                     {formatMoney(Math.max(walletBalance, 0))}
                   </Text>
-
                   <Text className="mt-1 text-[10px] text-white/50">
                     Available for withdrawal
                   </Text>
                 </View>
+
+                {amountOwed > 0 ? (
+                  <View className="mt-4 rounded-2xl bg-[#FF5A5A]/15 border border-[#FF5A5A]/30 p-4">
+                    <Text className="text-[#FFB4B4] text-xs font-bold">
+                      Amount owed to platform
+                    </Text>
+
+                    <Text className="mt-1 text-white text-lg font-extrabold">
+                      {formatMoney(amountOwed)}
+                    </Text>
+
+                    <Text className="mt-1 text-[10px] text-white/60">
+                      This will be deducted automatically from your future
+                      online-payment earnings.
+                    </Text>
+                  </View>
+                ) : null}
 
                 <View className={isTablet ? "w-[330px] ml-6" : "mt-5"}>
                   <View className="bg-white/10 rounded-[20px] p-4">

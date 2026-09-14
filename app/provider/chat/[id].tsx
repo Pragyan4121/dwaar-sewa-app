@@ -98,6 +98,7 @@ interface ChatPayload {
 
 interface QuickReply {
   id: string | number;
+  label: string;
   text: string;
 }
 
@@ -298,6 +299,8 @@ export default function ProviderChatScreen() {
 
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
 
+  const [quickRepliesVisible, setQuickRepliesVisible] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
 
   const [isSending, setIsSending] = useState(false);
@@ -449,6 +452,12 @@ export default function ProviderChatScreen() {
               typeof source.id === "string" || typeof source.id === "number"
                 ? source.id
                 : index,
+
+            label:
+              typeof source.label === "string" && source.label.trim()
+                ? source.label.trim()
+                : text,
+
             text,
           };
         })
@@ -1254,31 +1263,6 @@ export default function ProviderChatScreen() {
           </View>
         ) : null}
 
-        {/* Quick replies */}
-
-        {isActive && quickReplies.length > 0 ? (
-          <View className="border-b border-gray-200 bg-white px-3 py-2">
-            <FlatList
-              horizontal
-              data={quickReplies}
-              keyExtractor={(item) => String(item.id)}
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <Pressable
-                  className="mr-2 rounded-full border border-green-200 bg-green-50 px-4 py-2"
-                  onPress={() => {
-                    setMessageText(item.text);
-                  }}
-                >
-                  <Text className="text-sm font-semibold text-green-800">
-                    {item.text}
-                  </Text>
-                </Pressable>
-              )}
-            />
-          </View>
-        ) : null}
-
         {/* Messages */}
 
         <FlatList
@@ -1308,6 +1292,67 @@ export default function ProviderChatScreen() {
 
         {isActive ? (
           <View className="border-t border-gray-200 bg-white px-3 py-3">
+            {/* Compact Quick Replies */}
+            {quickReplies.length > 0 ? (
+              <View className="mb-2">
+                <Pressable
+                  className="self-start flex-row items-center rounded-xl border border-green-200 bg-green-50 px-3 py-2 active:opacity-70"
+                  onPress={() => {
+                    setQuickRepliesVisible((current) => !current);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Quick Replies"
+                >
+                  <Text className="text-xs font-bold text-green-800">
+                    Quick Replies
+                  </Text>
+
+                  <Text className="ml-2 text-xs font-bold text-green-700">
+                    {quickRepliesVisible ? "▲" : "▼"}
+                  </Text>
+                </Pressable>
+
+                {quickRepliesVisible ? (
+                  <View className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-2">
+                    <FlatList
+                      horizontal
+                      data={quickReplies}
+                      keyExtractor={(item) => String(item.id)}
+                      showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                      contentContainerStyle={{
+                        paddingRight: 4,
+                      }}
+                      renderItem={({ item }) => (
+                        <Pressable
+                          className="mr-2 max-w-[240px] rounded-xl border border-green-200 bg-white px-3 py-2 active:opacity-70"
+                          onPress={() => {
+                            setMessageText(item.text);
+                            setQuickRepliesVisible(false);
+                          }}
+                        >
+                          <Text
+                            className="text-xs font-bold text-green-800"
+                            numberOfLines={1}
+                          >
+                            {item.label}
+                          </Text>
+
+                          <Text
+                            className="mt-1 text-[10px] leading-4 text-gray-500"
+                            numberOfLines={2}
+                          >
+                            {item.text}
+                          </Text>
+                        </Pressable>
+                      )}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {/* Input + Send */}
             <View className="flex-row items-end">
               <TextInput
                 className="mr-2 max-h-28 min-h-12 flex-1 rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-base text-gray-900"

@@ -302,27 +302,18 @@ export default function BookingsScreen() {
       setConfirmingCancelId(null);
     }
   }
-
-  if (!isAuthenticated) {
-    return (
-      <SignInPrompt
-        title="Sign in to see your bookings"
-        message="Sign in to an existing account, or create a new one as a customer or a service provider."
-      />
-    );
-  }
-
-  const activeBookings = bookings.filter(
-    (booking) =>
-      booking.status !== "completed" && booking.status !== "cancelled",
+  const activeBookings = useMemo(
+    () =>
+      bookings.filter(
+        (booking) =>
+          booking.status !== "completed" && booking.status !== "cancelled",
+      ),
+    [bookings],
   );
 
-  const completedBookings = bookings.filter(
-    (booking) => booking.status === "completed",
-  );
-
-  const cancelledBookings = bookings.filter(
-    (booking) => booking.status === "cancelled",
+  const completedBookings = useMemo(
+    () => bookings.filter((booking) => booking.status === "completed"),
+    [bookings],
   );
 
   const visibleBookings = useMemo(() => {
@@ -343,6 +334,19 @@ export default function BookingsScreen() {
 
     return bookings;
   }, [bookings, selectedFilter]);
+
+  if (!isAuthenticated) {
+    return (
+      <SignInPrompt
+        title="Sign in to see your bookings"
+        message="Sign in to an existing account, or create a new one as a customer or a service provider."
+      />
+    );
+  }
+
+  const cancelledBookings = bookings.filter(
+    (booking) => booking.status === "cancelled",
+  );
 
   const filters: {
     key: BookingFilter;

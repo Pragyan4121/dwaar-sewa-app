@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   FileText,
   ImageIcon,
+  Mail,
   MapPin,
   Phone,
   Save,
@@ -63,6 +64,7 @@ export default function ProviderEditProfileScreen() {
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [bio, setBio] = useState("");
   const [yearsOfExperience, setYearsOfExperience] = useState("");
@@ -85,6 +87,7 @@ export default function ProviderEditProfileScreen() {
 
     setFullName(provider.full_name ?? "");
     setPhone(provider.phone ?? "");
+    setEmail(provider.email ?? "");
     setAddress(provider.profile?.address ?? "");
     setBio(provider.profile?.bio ?? "");
 
@@ -126,6 +129,15 @@ export default function ProviderEditProfileScreen() {
       nextErrors.phone = "Phone number is required";
     } else if (!/^[0-9+\-\s]{7,20}$/.test(normalizedPhone)) {
       nextErrors.phone = "Enter a valid phone number";
+    }
+
+    const normalizedEmail = email.trim();
+
+    if (
+      normalizedEmail &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalizedEmail)
+    ) {
+      nextErrors.email = "Enter a valid email address";
     }
 
     if (normalizedAddress.length > 500) {
@@ -234,6 +246,7 @@ export default function ProviderEditProfileScreen() {
     const input: UpdateProviderProfileInput = {
       fullName: fullName.trim(),
       phone: phone.trim(),
+      email: email.trim() || undefined,
       address: address.trim() || null,
       bio: bio.trim() || null,
       yearsOfExperience: Number(yearsOfExperience),
@@ -717,16 +730,40 @@ export default function ProviderEditProfileScreen() {
                       Email address
                     </Text>
 
-                    <View className="rounded-2xl border border-[#E7ECF2] bg-[#F5F7FA] px-4 py-3.5">
-                      <Text className="text-sm text-[#64748B]">
-                        {provider.email ?? "No email address"}
-                      </Text>
+                    <View className="relative">
+                      <Mail
+                        size={16}
+                        color="#64748B"
+                        style={{
+                          position: "absolute",
+                          left: 14,
+                          top: 17,
+                          zIndex: 1,
+                        }}
+                      />
+
+                      <TextInput
+                        className={`rounded-2xl border py-3.5 pl-11 pr-4 text-sm text-[#132F57] ${
+                          fieldErrors.email
+                            ? "border-[#FCA5A5] bg-[#FFF7F7]"
+                            : "border-[#E2E8F0] bg-[#FAFBFC]"
+                        }`}
+                        value={email}
+                        onChangeText={(value) => {
+                          setEmail(value);
+                          clearFieldError("email");
+                          setFormError("");
+                          setSuccessMessage("");
+                        }}
+                        placeholder="you@example.com"
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        editable={!isSubmitting}
+                      />
                     </View>
 
-                    <Text className="mt-2 text-[10px] leading-5 text-[#94A3B8]">
-                      Email changes are not currently supported from this
-                      screen.
-                    </Text>
+                    {renderFieldError("email")}
                   </View>
                 </View>
 

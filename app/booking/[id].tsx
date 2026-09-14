@@ -349,6 +349,14 @@ export default function BookingDetailScreen() {
   const provider = booking.users_bookings_provider_idTousers;
   const payment = booking.payments;
   const existingReview = booking.reviews;
+  const isOnlinePayment = booking.payment_method !== "cash";
+
+  const isPaymentPending = payment?.payment_status === "pending";
+
+  const isPaymentPaid = payment?.payment_status === "paid";
+
+  const canRetryOnlinePayment =
+    booking.status === "completed" && isOnlinePayment && isPaymentPending;
 
   const price =
     booking.final_price ??
@@ -818,7 +826,7 @@ export default function BookingDetailScreen() {
                   <Text className="text-muted text-xs">Service price</Text>
 
                   <Text className="text-primary text-2xl font-extrabold">
-                    ₹{price}
+                    NPR {price}
                   </Text>
                 </View>
 
@@ -839,18 +847,104 @@ export default function BookingDetailScreen() {
                   </Text>
                 </View>
 
-                {payment && (
+                {payment ? (
                   <View className="flex-row items-center justify-between mt-3">
                     <Text className="text-muted text-xs">Payment status</Text>
 
-                    <View className="px-2.5 py-1 rounded-full bg-[#EEF4FF]">
-                      <Text className="text-[#3563E9] text-[10px] font-bold capitalize">
+                    <View
+                      className={`px-2.5 py-1 rounded-full ${
+                        isPaymentPaid ? "bg-[#EAF8F1]" : "bg-[#FFF7E6]"
+                      }`}
+                    >
+                      <Text
+                        className={`text-[10px] font-bold capitalize ${
+                          isPaymentPaid ? "text-[#159A64]" : "text-[#B7791F]"
+                        }`}
+                      >
                         {payment.payment_status}
                       </Text>
                     </View>
                   </View>
-                )}
+                ) : null}
               </View>
+
+              {booking.status === "completed" &&
+              booking.payment_method === "cash" &&
+              isPaymentPending ? (
+                <View className="mt-4 rounded-2xl border border-[#FDE7B1] bg-[#FFF7E6] p-4">
+                  <View className="flex-row items-start">
+                    <Clock size={17} color="#B7791F" />
+
+                    <View className="flex-1 ml-2">
+                      <Text className="text-[#92400E] text-xs font-extrabold">
+                        Waiting for provider confirmation
+                      </Text>
+
+                      <Text className="text-[#A16207] text-[10px] leading-5 mt-1">
+                        Pay the provider in cash. The payment will be marked
+                        Paid after the provider confirms receiving it.
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+
+              {canRetryOnlinePayment ? (
+                <View className="mt-4 rounded-2xl border border-[#D8E4FF] bg-[#EEF4FF] p-4">
+                  <View className="flex-row items-start">
+                    <CreditCard size={17} color="#3563E9" />
+
+                    <View className="flex-1 ml-2">
+                      <Text className="text-[#1D4ED8] text-xs font-extrabold">
+                        Payment Pending
+                      </Text>
+
+                      <Text className="text-[#3563E9] text-[10px] leading-5 mt-1">
+                        Your online payment has not been completed yet. If a
+                        previous attempt failed or was cancelled, you can try
+                        again.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Pressable
+                    className="mt-4 rounded-2xl bg-[#3563E9] py-3.5 items-center active:opacity-80"
+                    onPress={() => {
+                      router.push({
+                        pathname: "/payment/[id]",
+                        params: {
+                          id: String(booking.id),
+                          method: booking.payment_method,
+                        },
+                      } as never);
+                    }}
+                  >
+                    <Text className="text-white text-sm font-bold">
+                      Try Again with{" "}
+                      {PAYMENT_METHOD_LABELS[booking.payment_method] ??
+                        booking.payment_method}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {isPaymentPaid ? (
+                <View className="mt-4 rounded-2xl border border-[#CDEBD9] bg-[#EAF8F1] p-4">
+                  <View className="flex-row items-center">
+                    <CheckCircle2 size={17} color="#159A64" />
+
+                    <View className="flex-1 ml-2">
+                      <Text className="text-[#047857] text-xs font-extrabold">
+                        Payment completed
+                      </Text>
+
+                      <Text className="text-[#047857] text-[10px] leading-5 mt-1">
+                        This payment has been successfully confirmed.
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
 
               <View className="flex-row items-center mt-4">
                 <ShieldCheck size={14} color="#159A64" />

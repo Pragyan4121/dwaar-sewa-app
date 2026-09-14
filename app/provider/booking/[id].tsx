@@ -43,6 +43,7 @@ import {
 import {
   acceptProviderBooking,
   completeProviderBooking,
+  confirmProviderCashPaymentReceived,
   getProviderBookingDetails,
   markProviderBookingArrived,
   markProviderBookingTravelling,
@@ -529,7 +530,42 @@ export default function ProviderBookingDetailsScreen() {
       </SafeAreaView>
     );
   }
+  function handleCashPaymentReceivedConfirmation() {
+    if (!booking || isProcessing) {
+      return;
+    }
 
+    confirmAction(
+      "Confirm cash payment",
+      "Have you received the full cash payment from the customer?",
+      "Payment Received",
+      () => {
+        void performCashPaymentReceived();
+      },
+    );
+  }
+
+  async function performCashPaymentReceived() {
+    if (!booking) {
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      await confirmProviderCashPaymentReceived(booking.id);
+
+      setSuccessMessage("Cash payment confirmed successfully.");
+
+      await loadBooking(true);
+    } catch (error) {
+      handleActionError(error, "Unable to confirm the cash payment.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
   const statusClasses = getStatusClasses(booking.status);
 
   const canAccept =
@@ -542,6 +578,10 @@ export default function ProviderBookingDetailsScreen() {
   const canStart = booking.status === "arrived";
 
   const canComplete = booking.status === "in_progress";
+  const canConfirmCashPayment =
+    booking.status === "completed" &&
+    booking.payment_method === "cash" &&
+    booking.payments?.payment_status === "pending";
 
   const canChat = ["accepted", "travelling", "arrived", "in_progress"].includes(
     booking.status,
@@ -1055,15 +1095,16 @@ export default function ProviderBookingDetailsScreen() {
                     <View className="bg-[#FFF7E6] border border-[#FDE7B1] rounded-2xl px-4 py-3 mt-3">
                       <Text className="text-[#92400E] text-[10px] leading-5">
                         Collect the final amount from the customer. Platform
-                        commission is deducted from your wallet after
-                        completion.
+                        commission is settled only after you confirm that the
+                        cash payment was received.
                       </Text>
                     </View>
                   ) : (
                     <View className="bg-[#EEF4FF] border border-[#D8E4FF] rounded-2xl px-4 py-3 mt-3">
                       <Text className="text-[#1D4ED8] text-[10px] leading-5">
                         The customer pays online. Your net earnings are credited
-                        after commission when the job is completed.
+                        only after the payment gateway verifies a successful
+                        payment.
                       </Text>
                     </View>
                   )}
@@ -1124,6 +1165,18 @@ export default function ProviderBookingDetailsScreen() {
                         </Text>
                       </View>
                     </View>
+                  </View>
+                ) : null}
+                {canConfirmCashPayment ? (
+                  <View className="mt-4 rounded-2xl border border-[#FDE7B1] bg-[#FFF7E6] p-4">
+                    <Text className="text-[#92400E] text-xs font-extrabold">
+                      Cash payment awaiting confirmation
+                    </Text>
+
+                    <Text className="text-[#92400E] text-[10px] leading-5 mt-1">
+                      After you physically receive the cash from the customer,
+                      confirm it below.
+                    </Text>
                   </View>
                 ) : null}
 
@@ -1270,12 +1323,32 @@ export default function ProviderBookingDetailsScreen() {
                       )}
                     </Pressable>
                   ) : null}
+                  {canConfirmCashPayment ? (
+                    <Pressable
+                      className="rounded-2xl bg-[#159A64] py-4 items-center mt-4 flex-row justify-center active:opacity-80"
+                      onPress={handleCashPaymentReceivedConfirmation}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Banknote size={16} color="#FFFFFF" />
+
+                          <Text className="ml-2 text-white font-bold text-sm">
+                            Payment Received
+                          </Text>
+                        </>
+                      )}
+                    </Pressable>
+                  ) : null}
 
                   {!canAccept &&
                   !canTravelling &&
                   !canArrived &&
                   !canStart &&
-                  !canComplete ? (
+                  !canComplete &&
+                  !canConfirmCashPayment ? (
                     <View className="bg-[#F8FAFC] border border-[#EEF2F6] rounded-2xl p-4 mt-4 flex-row items-center">
                       <ShieldCheck size={17} color="#64748B" />
 

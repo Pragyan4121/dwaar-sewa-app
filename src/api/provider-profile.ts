@@ -5,6 +5,7 @@ import type { AuthenticatedProvider, ProviderProfileResponse } from "@/types";
 export interface UpdateProviderProfileInput {
   fullName?: string;
   phone?: string;
+  email?: string;
   address?: string | null;
   bio?: string | null;
   yearsOfExperience?: number;

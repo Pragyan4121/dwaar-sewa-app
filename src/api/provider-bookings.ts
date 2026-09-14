@@ -102,3 +102,11 @@ export async function completeProviderBooking(
 
   return data.booking;
 }
+
+export async function confirmProviderCashPaymentReceived(bookingId: number) {
+  const { data } = await providerApi.post(
+    `/payments/${bookingId}/cash/received`,
+  );
+
+  return data;
+}
