@@ -248,6 +248,18 @@ export default function ServiceDetailScreen() {
 
   const [bookingType, setBookingType] = useState<BookingType>("home_visit");
 
+  // Video consultations have no in-person provider to take cash, so cash is
+  // only offered for home visits.
+  const paymentOptions = PAYMENT_METHOD_OPTIONS.filter(
+    (option) => bookingType !== "video_consultation" || option.value !== "cash",
+  );
+
+  useEffect(() => {
+    if (bookingType === "video_consultation" && paymentMethod === "cash") {
+      setPaymentMethod("esewa");
+    }
+  }, [bookingType, paymentMethod]);
+
   const [availableCredits, setAvailableCredits] = useState<
     ConsultationCredit[]
   >([]);
@@ -1263,7 +1275,7 @@ export default function ServiceDetailScreen() {
                   </View>
 
                   <View className="mb-5">
-                    {PAYMENT_METHOD_OPTIONS.map((option) => {
+                    {paymentOptions.map((option) => {
                       const isSelected = paymentMethod === option.value;
 
                       return (
