@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -19,14 +19,20 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  Gift,
+  Home,
   MapPin,
   Plus,
   ShieldCheck,
   Sparkles,
   Star,
   Tag,
+  Video,
   Wallet,
+  Zap,
 } from "lucide-react-native";
+
+import type { BookingType, ConsultationCredit } from "@/types";
 
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
@@ -53,24 +59,56 @@ function formatHourLabel(hour: number): string {
   return `${hour12}:00 ${period}`;
 }
 
-const DATE_OPTIONS = Array.from({ length: 14 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() + i);
+/*
+| Scheduling rules
+|
+| - Dates start from today (never in the past) and cover the next 14 days.
+| - Time slots run 8:00 AM - 8:00 PM, hourly.
+| - For today, anything within the next ASAP_WINDOW_MINUTES is offered as a
+|   single "ASAP" option instead of individual slots.
+| - Slots that have already passed are never shown.
+*/
+const ASAP_WINDOW_MINUTES = 120;
+const ASAP_START_MINUTES = 6 * 60;
+const FIRST_SLOT_HOUR = 8;
+const LAST_SLOT_HOUR = 20;
 
-  return {
-    value: formatDateValue(d),
-    label: formatDateLabel(d),
-  };
-});
+function buildDateOptions(from: Date) {
+  return Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(from);
+    d.setDate(d.getDate() + i);
 
-const TIME_OPTIONS = Array.from({ length: 13 }, (_, i) => {
-  const hour = 8 + i;
+    return {
+      value: formatDateValue(d),
+      label: formatDateLabel(d),
+    };
+  });
+}
 
-  return {
-    value: `${String(hour).padStart(2, "0")}:00`,
-    label: formatHourLabel(hour),
-  };
-});
+const TIME_OPTIONS = Array.from(
+  { length: LAST_SLOT_HOUR - FIRST_SLOT_HOUR + 1 },
+  (_, i) => {
+    const hour = FIRST_SLOT_HOUR + i;
+
+    return {
+      value: `${String(hour).padStart(2, "0")}:00`,
+      label: formatHourLabel(hour),
+      minutes: hour * 60,
+    };
+  },
+);
+
+function useNow(intervalMs: number): Date {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), intervalMs);
+
+    return () => clearInterval(timer);
+  }, [intervalMs]);
+
+  return now;
+}
 
 const NEW_ADDRESS = "new" as const;
 
@@ -188,7 +226,17 @@ export default function ServiceDetailScreen() {
 
   const [saveNewAddress, setSaveNewAddress] = useState(true);
 
-  const [preferredDate, setPreferredDate] = useState(DATE_OPTIONS[0].value);
+  const now = useNow(30000);
+
+  const todayValue = formatDateValue(now);
+
+  const dateOptions = useMemo(() => buildDateOptions(new Date()), [todayValue]);
+
+  const [preferredDate, setPreferredDate] = useState(() =>
+    formatDateValue(new Date()),
+  );
+
+  const [timeMode, setTimeMode] = useState<"asap" | "schedule">("asap");
 
   const [preferredTime, setPreferredTime] = useState<string | null>(null);
 
@@ -198,11 +246,71 @@ export default function ServiceDetailScreen() {
     useState<PaymentMethodValue>("cash");
   const [promoCode, setPromoCode] = useState("");
 
+  const [bookingType, setBookingType] = useState<BookingType>("home_visit");
+
+  const [availableCredits, setAvailableCredits] = useState<
+    ConsultationCredit[]
+  >([]);
+
+  const [selectedCreditId, setSelectedCreditId] = useState<number | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
 
   const [bookingError, setBookingError] = useState<string | null>(null);
 
   const [bookingSuccess, setBookingSuccess] = useState(false);
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const isTodaySelected = preferredDate === todayValue;
+
+  const asapAvailable =
+    isTodaySelected &&
+    nowMinutes >= ASAP_START_MINUTES &&
+    nowMinutes < LAST_SLOT_HOUR * 60;
+
+  const earliestSlotMinutes = isTodaySelected
+    ? asapAvailable
+      ? nowMinutes + ASAP_WINDOW_MINUTES
+      : nowMinutes + 1
+    : 0;
+
+  const timeOptions = useMemo(
+    () =>
+      TIME_OPTIONS.filter((option) => option.minutes >= earliestSlotMinutes),
+    [earliestSlotMinutes],
+  );
+
+  // Today is unusable once ASAP is closed and no slots remain.
+  const todayExhausted =
+    !(nowMinutes >= ASAP_START_MINUTES && nowMinutes < LAST_SLOT_HOUR * 60) &&
+    !TIME_OPTIONS.some((option) => option.minutes > nowMinutes);
+
+  const firstBookableDate = todayExhausted
+    ? (dateOptions[1]?.value ?? dateOptions[0].value)
+    : dateOptions[0].value;
+
+  // Keep selections valid as time passes (midnight rollover, slot expiry).
+  useEffect(() => {
+    if (preferredDate < firstBookableDate) {
+      setPreferredDate(firstBookableDate);
+    }
+  }, [preferredDate, firstBookableDate]);
+
+  useEffect(() => {
+    if (!asapAvailable && timeMode === "asap") {
+      setTimeMode("schedule");
+    }
+  }, [asapAvailable, timeMode]);
+
+  useEffect(() => {
+    if (
+      preferredTime &&
+      !timeOptions.some((option) => option.value === preferredTime)
+    ) {
+      setPreferredTime(null);
+    }
+  }, [preferredTime, timeOptions]);
 
   useEffect(() => {
     api
@@ -238,6 +346,21 @@ export default function ServiceDetailScreen() {
       .finally(() => setLoadingAddresses(false));
   }
 
+  function loadAvailableCredits() {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    api
+      .get<{ consultation_credits: ConsultationCredit[] }>(
+        "/bookings/consultation-credits",
+      )
+      .then(({ data }) => {
+        setAvailableCredits(data.consultation_credits);
+      })
+      .catch(() => {});
+  }
+
   function handleBookNowPress() {
     if (!isAuthenticated) {
       router.push("/auth/login");
@@ -246,6 +369,7 @@ export default function ServiceDetailScreen() {
 
     setShowBookingForm(true);
     loadAddresses();
+    loadAvailableCredits();
   }
 
   async function submitBooking() {
@@ -281,6 +405,25 @@ export default function ServiceDetailScreen() {
       return;
     }
 
+    if (preferredDate < formatDateValue(new Date())) {
+      setBookingError("That date has passed. Please choose another date.");
+      return;
+    }
+
+    const isAsap = asapAvailable && timeMode === "asap";
+
+    if (!isAsap) {
+      if (!preferredTime) {
+        setBookingError("Please select a time slot.");
+        return;
+      }
+
+      if (!timeOptions.some((option) => option.value === preferredTime)) {
+        setBookingError("That time has passed. Please choose a later time.");
+        return;
+      }
+    }
+
     setBookingError(null);
     setSubmitting(true);
 
@@ -304,12 +447,18 @@ export default function ServiceDetailScreen() {
         serviceAddress,
         serviceArea,
         preferredDate,
-        preferredTime: preferredTime ?? undefined,
+        preferredTime: isAsap ? undefined : (preferredTime ?? undefined),
+        isAsap: isAsap || undefined,
         notes: notes || undefined,
         paymentMethod,
         promoCode: promoCode.trim()
           ? promoCode.trim().toUpperCase()
           : undefined,
+        bookingType,
+        consultationCreditId:
+          bookingType === "home_visit" && selectedCreditId
+            ? selectedCreditId
+            : undefined,
       });
 
       setBookingSuccess(true);
@@ -786,6 +935,147 @@ export default function ServiceDetailScreen() {
                     </View>
                   )}
 
+                  {/* BOOKING TYPE */}
+                  {service?.video_consultation_price ? (
+                    <>
+                      <View className="flex-row items-center mb-3">
+                        <View className="w-9 h-9 rounded-xl bg-[#EEF4FF] items-center justify-center">
+                          <Video size={17} color="#3563E9" />
+                        </View>
+
+                        <View className="ml-2.5">
+                          <Text className="text-secondary text-sm font-extrabold">
+                            How would you like this done?
+                          </Text>
+
+                          <Text className="text-muted text-[10px] mt-0.5">
+                            Try video guidance first, or book a home visit
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View className="flex-row mb-5" style={{ gap: 10 }}>
+                        <Pressable
+                          className={`flex-1 rounded-2xl border p-4 ${
+                            bookingType === "home_visit"
+                              ? "border-primary bg-[#FFF3EE]"
+                              : "border-[#E2E8F0] bg-white"
+                          }`}
+                          onPress={() => setBookingType("home_visit")}
+                        >
+                          <Home
+                            size={18}
+                            color={
+                              bookingType === "home_visit"
+                                ? "#FF5A3C"
+                                : "#64748B"
+                            }
+                          />
+
+                          <Text className="text-secondary text-xs font-extrabold mt-2">
+                            Home Visit
+                          </Text>
+
+                          <Text className="text-muted text-[10px] mt-0.5">
+                            Rs. {service.base_price}
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          className={`flex-1 rounded-2xl border p-4 ${
+                            bookingType === "video_consultation"
+                              ? "border-primary bg-[#FFF3EE]"
+                              : "border-[#E2E8F0] bg-white"
+                          }`}
+                          onPress={() => {
+                            setBookingType("video_consultation");
+                            setSelectedCreditId(null);
+                          }}
+                        >
+                          <Video
+                            size={18}
+                            color={
+                              bookingType === "video_consultation"
+                                ? "#FF5A3C"
+                                : "#64748B"
+                            }
+                          />
+
+                          <Text className="text-secondary text-xs font-extrabold mt-2">
+                            Video Consultation
+                          </Text>
+
+                          <Text className="text-muted text-[10px] mt-0.5">
+                            Rs. {service.video_consultation_price}
+                          </Text>
+                        </Pressable>
+                      </View>
+
+                      {bookingType === "video_consultation" ? (
+                        <View className="bg-[#EEF4FF] border border-[#D8E4FF] rounded-2xl px-4 py-3 mb-5">
+                          <Text className="text-[#1D4ED8] text-[10px] leading-5">
+                            Your provider will guide you over a video call. If
+                            the issue isn't fixed, the consultation fee will be
+                            deducted from the home visit price.
+                          </Text>
+                        </View>
+                      ) : null}
+                    </>
+                  ) : null}
+
+                  {bookingType === "home_visit" &&
+                  availableCredits.length > 0 ? (
+                    <>
+                      <View className="flex-row items-center mb-3">
+                        <View className="w-9 h-9 rounded-xl bg-[#EAF8F1] items-center justify-center">
+                          <Gift size={17} color="#159A64" />
+                        </View>
+
+                        <View className="ml-2.5">
+                          <Text className="text-secondary text-sm font-extrabold">
+                            Consultation credit
+                          </Text>
+
+                          <Text className="text-muted text-[10px] mt-0.5">
+                            From a previous video consultation
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View className="mb-5" style={{ gap: 8 }}>
+                        {availableCredits.map((credit) => {
+                          const isSelected = selectedCreditId === credit.id;
+
+                          return (
+                            <Pressable
+                              key={credit.id}
+                              className={`flex-row items-center justify-between rounded-2xl border p-4 ${
+                                isSelected
+                                  ? "border-[#159A64] bg-[#EAF8F1]"
+                                  : "border-[#E2E8F0] bg-white"
+                              }`}
+                              onPress={() =>
+                                setSelectedCreditId(
+                                  isSelected ? null : credit.id,
+                                )
+                              }
+                            >
+                              <Text className="text-secondary text-xs font-bold">
+                                Rs. {credit.credit_amount} credit available
+                              </Text>
+
+                              {isSelected ? (
+                                <View className="w-6 h-6 rounded-full bg-[#159A64] items-center justify-center">
+                                  <Check size={14} color="#FFFFFF" />
+                                </View>
+                              ) : null}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </>
+                  ) : null}
+
                   {/* DATE */}
                   <View className="flex-row items-center mb-3 mt-1">
                     <View className="w-9 h-9 rounded-xl bg-[#EEF4FF] items-center justify-center">
@@ -811,22 +1101,28 @@ export default function ServiceDetailScreen() {
                       gap: 8,
                     }}
                   >
-                    {DATE_OPTIONS.map((option) => {
+                    {dateOptions.map((option) => {
                       const isSelected = preferredDate === option.value;
+                      const isDisabled = option.value < firstBookableDate;
 
                       return (
                         <Pressable
                           key={option.value}
+                          disabled={isDisabled}
                           onPress={() => setPreferredDate(option.value)}
                           className={`px-4 py-3 rounded-2xl border ${
-                            isSelected
-                              ? "bg-[#132F57] border-[#132F57]"
-                              : "bg-[#FAFBFC] border-[#E2E8F0]"
+                            isDisabled
+                              ? "bg-[#F1F5F9] border-[#E2E8F0] opacity-50"
+                              : isSelected
+                                ? "bg-[#132F57] border-[#132F57]"
+                                : "bg-[#FAFBFC] border-[#E2E8F0]"
                           }`}
                         >
                           <Text
                             className={`text-xs font-bold ${
-                              isSelected ? "text-white" : "text-secondary"
+                              isSelected && !isDisabled
+                                ? "text-white"
+                                : "text-secondary"
                             }`}
                           >
                             {option.label}
@@ -848,38 +1144,106 @@ export default function ServiceDetailScreen() {
                       </Text>
 
                       <Text className="text-muted text-[10px] mt-0.5">
-                        Optional
+                        {asapAvailable
+                          ? "Need help soon? Choose ASAP, or pick a later time"
+                          : "Choose a time slot"}
                       </Text>
                     </View>
                   </View>
 
-                  <View className="flex-row flex-wrap mb-5">
-                    {TIME_OPTIONS.map((option) => {
-                      const isSelected = preferredTime === option.value;
+                  {asapAvailable ? (
+                    <View className="flex-row mb-3" style={{ gap: 10 }}>
+                      <Pressable
+                        className={`flex-1 rounded-2xl border p-4 ${
+                          timeMode === "asap"
+                            ? "border-primary bg-[#FFF3EE]"
+                            : "border-[#E2E8F0] bg-white"
+                        }`}
+                        onPress={() => setTimeMode("asap")}
+                      >
+                        <Zap
+                          size={18}
+                          color={timeMode === "asap" ? "#FF5A3C" : "#64748B"}
+                        />
 
-                      return (
-                        <Pressable
-                          key={option.value}
-                          onPress={() =>
-                            setPreferredTime(isSelected ? null : option.value)
+                        <Text className="text-secondary text-xs font-extrabold mt-2">
+                          ASAP
+                        </Text>
+
+                        <Text className="text-muted text-[10px] mt-0.5">
+                          Within 2 hours
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        className={`flex-1 rounded-2xl border p-4 ${
+                          timeMode === "schedule"
+                            ? "border-primary bg-[#FFF3EE]"
+                            : "border-[#E2E8F0] bg-white"
+                        }`}
+                        onPress={() => setTimeMode("schedule")}
+                      >
+                        <Clock
+                          size={18}
+                          color={
+                            timeMode === "schedule" ? "#FF5A3C" : "#64748B"
                           }
-                          className={`px-3.5 py-2.5 rounded-xl mr-2 mb-2 border ${
-                            isSelected
-                              ? "bg-primary border-primary"
-                              : "bg-[#FAFBFC] border-[#E2E8F0]"
-                          }`}
-                        >
-                          <Text
-                            className={`text-[11px] font-bold ${
-                              isSelected ? "text-white" : "text-secondary"
+                        />
+
+                        <Text className="text-secondary text-xs font-extrabold mt-2">
+                          Pick a time
+                        </Text>
+
+                        <Text className="text-muted text-[10px] mt-0.5">
+                          Later today
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+
+                  {asapAvailable && timeMode === "asap" ? (
+                    <View className="bg-[#EEF4FF] border border-[#D8E4FF] rounded-2xl px-4 py-3 mb-5">
+                      <Text className="text-[#1D4ED8] text-[10px] leading-5">
+                        We will look for the first available provider and aim to
+                        get you help within 2 hours.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View className="flex-row flex-wrap mb-5">
+                      {timeOptions.length === 0 ? (
+                        <Text className="text-muted text-[11px]">
+                          No more time slots are available for this date. Please
+                          choose another date.
+                        </Text>
+                      ) : null}
+
+                      {timeOptions.map((option) => {
+                        const isSelected = preferredTime === option.value;
+
+                        return (
+                          <Pressable
+                            key={option.value}
+                            onPress={() =>
+                              setPreferredTime(isSelected ? null : option.value)
+                            }
+                            className={`px-3.5 py-2.5 rounded-xl mr-2 mb-2 border ${
+                              isSelected
+                                ? "bg-primary border-primary"
+                                : "bg-[#FAFBFC] border-[#E2E8F0]"
                             }`}
                           >
-                            {option.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                            <Text
+                              className={`text-[11px] font-bold ${
+                                isSelected ? "text-white" : "text-secondary"
+                              }`}
+                            >
+                              {option.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
 
                   {/* PAYMENT */}
                   <View className="flex-row items-center mb-3">

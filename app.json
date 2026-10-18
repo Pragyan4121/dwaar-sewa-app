@@ -18,15 +18,26 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.dwaarsewa.app",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Dwaar Sewa uses your photo library so you can choose a profile photo."
+        "NSPhotoLibraryUsageDescription": "Dwaar Sewa uses your photo library so you can choose a profile photo.",
+        "NSCameraUsageDescription": "Dwaar Sewa uses your camera so you can take a photo to send in chat or join a video consultation.",
+        "NSMicrophoneUsageDescription": "Dwaar Sewa uses your microphone for voice and video calls with your provider."
       }
     },
     "android": {
+      "package": "com.dwaarsewa.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FF5A3C"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#ffffff"
       },
-      "package": "com.dwaarsewa.app"
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -39,13 +50,24 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Dwaar Sewa uses your photo library so you can choose a profile photo."
+          "photosPermission": "Dwaar Sewa uses your photo library so you can choose a profile photo.",
+          "cameraPermission": "Dwaar Sewa uses your camera so you can take a photo to send in chat."
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Dwaar Sewa uses your camera for video consultations with your provider.",
+          "microphonePermission": "Dwaar Sewa uses your microphone for voice and video calls with your provider."
         }
       ]
     ],
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "443cfde8-2025-4aa0-bda4-de01fd2faf6b"
       }
     }
   }

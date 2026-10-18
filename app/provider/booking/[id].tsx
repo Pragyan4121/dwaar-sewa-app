@@ -48,6 +48,7 @@ import {
   markProviderBookingArrived,
   markProviderBookingTravelling,
   rejectProviderBooking,
+  setConsultationOutcome,
   startProviderBooking,
 } from "@/api/provider-bookings";
 
@@ -479,6 +480,53 @@ export default function ProviderBookingDetailsScreen() {
     }
   }
 
+  function handleConsultationOutcomeConfirmation(
+    outcome: "resolved" | "needs_visit",
+  ) {
+    if (!booking || isProcessing) {
+      return;
+    }
+
+    confirmAction(
+      outcome === "resolved" ? "Mark as resolved" : "Needs a home visit",
+      outcome === "resolved"
+        ? "Confirm that no home visit is needed for this customer?"
+        : "Confirm that this customer needs a follow-up home visit? They'll receive a credit for what they already paid toward it.",
+      "Confirm",
+      () => {
+        void performSetConsultationOutcome(outcome);
+      },
+    );
+  }
+
+  async function performSetConsultationOutcome(
+    outcome: "resolved" | "needs_visit",
+  ) {
+    if (!booking) {
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      await setConsultationOutcome(booking.id, outcome);
+
+      setSuccessMessage(
+        outcome === "resolved"
+          ? "Consultation marked as resolved."
+          : "Consultation outcome recorded — the customer has been credited.",
+      );
+
+      await loadBooking(true);
+    } catch (error) {
+      handleActionError(error, "Unable to record the consultation outcome.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
   function handleActionError(error: unknown, fallbackMessage: string) {
     console.error("Provider booking action error:", error);
 
@@ -575,9 +623,18 @@ export default function ProviderBookingDetailsScreen() {
 
   const canArrived = booking.status === "travelling";
 
-  const canStart = booking.status === "arrived";
+  const isVideoConsultation = booking.booking_type === "video_consultation";
 
-  const canComplete = booking.status === "in_progress";
+  const canStart = booking.status === "arrived" && !isVideoConsultation;
+
+  const canComplete = booking.status === "in_progress" && !isVideoConsultation;
+
+  const canRecordConsultationOutcome =
+    isVideoConsultation &&
+    booking.payments?.payment_status === "paid" &&
+    !booking.consultation_outcome &&
+    booking.status !== "cancelled" &&
+    booking.status !== "completed";
   const canConfirmCashPayment =
     booking.status === "completed" &&
     booking.payment_method === "cash" &&
@@ -694,6 +751,14 @@ export default function ProviderBookingDetailsScreen() {
                     <Text className="text-white/60 text-xs mt-1.5">
                       {booking.services.service_categories.name}
                     </Text>
+
+                    {isVideoConsultation ? (
+                      <View className="self-start rounded-full bg-white/20 px-3 py-1 mt-2">
+                        <Text className="text-white text-[10px] font-extrabold tracking-wide">
+                          VIDEO CONSULTATION
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
 
                   <View
@@ -1323,6 +1388,52 @@ export default function ProviderBookingDetailsScreen() {
                       )}
                     </Pressable>
                   ) : null}
+
+                  {canRecordConsultationOutcome ? (
+                    <View className="mt-4">
+                      <Text className="mb-2 text-sm font-semibold text-gray-700">
+                        Once your call with the customer has ended, record the
+                        outcome:
+                      </Text>
+
+                      <Pressable
+                        className="rounded-2xl bg-[#159A64] py-4 items-center flex-row justify-center active:opacity-80"
+                        onPress={() =>
+                          handleConsultationOutcomeConfirmation("resolved")
+                        }
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <ActivityIndicator color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <CheckCircle2 size={16} color="#FFFFFF" />
+
+                            <Text className="ml-2 text-white font-bold text-sm">
+                              Resolved — no visit needed
+                            </Text>
+                          </>
+                        )}
+                      </Pressable>
+
+                      <Pressable
+                        className="mt-3 rounded-2xl border border-[#159A64] bg-white py-4 items-center flex-row justify-center active:opacity-80"
+                        onPress={() =>
+                          handleConsultationOutcomeConfirmation("needs_visit")
+                        }
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <ActivityIndicator color="#159A64" />
+                        ) : (
+                          <Text className="font-bold text-sm text-[#159A64]">
+                            Needs a home visit
+                          </Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  ) : null}
+
                   {canConfirmCashPayment ? (
                     <Pressable
                       className="rounded-2xl bg-[#159A64] py-4 items-center mt-4 flex-row justify-center active:opacity-80"

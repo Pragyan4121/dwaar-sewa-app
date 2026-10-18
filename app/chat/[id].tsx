@@ -12,6 +12,7 @@ import React, {
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -24,18 +25,28 @@ import {
 } from "react-native";
 
 import {
+  Camera,
   Check,
+  File,
+  Image as ImageIcon,
+  Paperclip,
   Phone,
   PhoneOff,
   Smartphone,
+  Video,
   Wifi,
   X,
 } from "lucide-react-native";
 
 import { io, Socket } from "socket.io-client";
 
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import { RTCView } from "react-native-webrtc";
+
 import api from "@/api/client";
 import { getToken } from "@/api/storage";
+import { useWebRTCCall, type CallMediaType } from "@/hooks/useWebRTCCall";
 
 type ChatSenderRole = "customer" | "provider" | "system";
 
@@ -69,6 +80,10 @@ interface BookingSummary {
 
   preferred_date?: string | null;
   preferred_time?: string | null;
+
+  booking_type?: string;
+
+  can_start_video_consultation?: boolean;
 
   services?: {
     id?: number;
@@ -119,6 +134,7 @@ interface StartCallCallback {
   callId?: string;
   bookingId?: number;
   status?: string;
+  callType?: CallMediaType;
   code?: string;
   message?: string;
 }
@@ -139,6 +155,8 @@ interface CallSignalPayload {
   callerName?: string;
   caller_name?: string;
 
+  callType?: CallMediaType;
+
   message?: string;
   code?: string;
 }
@@ -156,6 +174,22 @@ function getSocketBaseUrl() {
 
   return apiBaseUrl.replace(/\/api\/?$/, "");
 }
+
+function getImageUrl(imageUrl: string | null | undefined) {
+  if (!imageUrl) {
+    return null;
+  }
+
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    return imageUrl;
+  }
+
+  const backendBaseUrl = getSocketBaseUrl();
+
+  return `${backendBaseUrl}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
+}
+
+const MAX_CHAT_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function formatTime(value: string | null | undefined) {
   if (!value) {
@@ -316,6 +350,12 @@ export default function CustomerChatScreen() {
 
   const [callMenuVisible, setCallMenuVisible] = useState(false);
 
+  const [attachMenuVisible, setAttachMenuVisible] = useState(false);
+
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
   const [freeCallStatus, setFreeCallStatus] = useState<FreeCallStatus>("idle");
 
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
@@ -332,7 +372,17 @@ export default function CustomerChatScreen() {
 
   const activeCallIdRef = useRef<string | null>(null);
 
+  const activeCallTypeRef = useRef<CallMediaType>("audio");
+
+  const [activeCallType, setActiveCallType] = useState<CallMediaType>("audio");
+
   const freeCallStatusRef = useRef<FreeCallStatus>("idle");
+
+  const webrtc = useWebRTCCall({
+    socketRef,
+    bookingId,
+    activeCallIdRef,
+  });
 
   const listRef = useRef<FlatList<ChatMessage> | null>(null);
 
@@ -669,6 +719,9 @@ export default function CustomerChatScreen() {
               ? payload.caller_name.trim()
               : "Provider";
 
+        activeCallTypeRef.current = payload.callType ?? "audio";
+        setActiveCallType(payload.callType ?? "audio");
+
         setIncomingCallerName(callerName);
 
         setActiveCallId(payload.callId);
@@ -683,6 +736,11 @@ export default function CustomerChatScreen() {
       /*
       |--------------------------------------------------------------------------
       | Free call accepted by provider
+      |--------------------------------------------------------------------------
+      |
+      | This side initiated the call (startFreeCall), so it's the caller
+      | — now that the other side has accepted, capture local media and
+      | send the WebRTC offer.
       |--------------------------------------------------------------------------
       */
 
@@ -707,6 +765,8 @@ export default function CustomerChatScreen() {
 
         updateFreeCallStatus("accepted");
         setErrorMessage("");
+
+        void webrtc.startAsCaller(activeCallTypeRef.current);
       });
 
       /*
@@ -720,6 +780,7 @@ export default function CustomerChatScreen() {
           return;
         }
 
+        webrtc.endCall();
         resetFreeCall();
         setErrorMessage("The provider declined the Free Call.");
       });
@@ -735,27 +796,58 @@ export default function CustomerChatScreen() {
           return;
         }
 
+        webrtc.endCall();
         resetFreeCall();
       });
 
       /*
-       * WebRTC signaling listeners are registered now.
-       *
-       * We will use them in the next step when actual microphone/audio
-       * WebRTC handling is added.
-       */
+      |--------------------------------------------------------------------------
+      | WebRTC signaling
+      |--------------------------------------------------------------------------
+      */
 
-      socket.on("call:offer", (payload) => {
-        console.log("Customer received WebRTC offer:", payload);
-      });
+      socket.on(
+        "call:offer",
+        (payload: { offer?: { sdp?: string; type?: string } }) => {
+          if (payload?.offer?.sdp && payload.offer.type) {
+            void webrtc.handleRemoteOffer({
+              sdp: payload.offer.sdp,
+              type: payload.offer.type,
+            });
+          }
+        },
+      );
 
-      socket.on("call:answer", (payload) => {
-        console.log("Customer received WebRTC answer:", payload);
-      });
+      socket.on(
+        "call:answer",
+        (payload: { answer?: { sdp?: string; type?: string } }) => {
+          if (payload?.answer?.sdp && payload.answer.type) {
+            void webrtc.handleRemoteAnswer({
+              sdp: payload.answer.sdp,
+              type: payload.answer.type,
+            });
+          }
+        },
+      );
 
-      socket.on("call:ice-candidate", (payload) => {
-        console.log("Customer received ICE candidate:", payload);
-      });
+      socket.on(
+        "call:ice-candidate",
+        (payload: {
+          candidate?: {
+            candidate?: string;
+            sdpMid?: string | null;
+            sdpMLineIndex?: number | null;
+          };
+        }) => {
+          if (payload?.candidate?.candidate) {
+            void webrtc.handleRemoteIceCandidate({
+              candidate: payload.candidate.candidate,
+              sdpMid: payload.candidate.sdpMid,
+              sdpMLineIndex: payload.candidate.sdpMLineIndex,
+            });
+          }
+        },
+      );
     }
 
     void connectSocket();
@@ -847,6 +939,161 @@ export default function CustomerChatScreen() {
     }
   }
 
+  async function sendImageMessage(
+    uri: string,
+    fileName: string,
+    mimeType: string,
+    fileSizeBytes: number | null,
+  ) {
+    if (!isActive || isUploadingImage) {
+      return;
+    }
+
+    if (fileSizeBytes !== null && fileSizeBytes > MAX_CHAT_IMAGE_BYTES) {
+      setErrorMessage(
+        "That image is larger than 5 MB. Please choose a smaller one.",
+      );
+
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+
+      setErrorMessage("");
+
+      const formData = new FormData();
+
+      // React Native's FormData accepts this { uri, name, type } shape
+      // for a file field — it is not a real Blob, but this is the
+      // documented pattern for file uploads on this platform.
+      formData.append("image", {
+        uri,
+        name: fileName,
+        type: mimeType,
+      } as unknown as Blob);
+
+      const { data } = await api.post(
+        `/chats/orders/${bookingId}/images`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        },
+      );
+
+      const source =
+        data && typeof data === "object"
+          ? (data as Record<string, unknown>)
+          : {};
+
+      const created =
+        normalizeMessage(source.chat_message) ??
+        normalizeMessage(source.message) ??
+        normalizeMessage(source.data);
+
+      if (created) {
+        setMessages((current) => upsertMessage(current, created));
+      } else {
+        await loadChat();
+      }
+    } catch (error) {
+      console.error("Send chat image error:", error);
+
+      setErrorMessage(getErrorMessage(error, "Unable to send the image."));
+    } finally {
+      setIsUploadingImage(false);
+    }
+  }
+
+  async function handlePickFromCamera() {
+    setAttachMenuVisible(false);
+
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      setErrorMessage("Camera permission is required to take a photo.");
+
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+
+    const asset = result.canceled ? null : result.assets?.[0];
+
+    if (!asset) {
+      return;
+    }
+
+    await sendImageMessage(
+      asset.uri,
+      asset.fileName ?? `photo-${Date.now()}.jpg`,
+      asset.mimeType ?? "image/jpeg",
+      asset.fileSize ?? null,
+    );
+  }
+
+  async function handlePickFromLibrary() {
+    setAttachMenuVisible(false);
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      setErrorMessage("Photo library permission is required.");
+
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+
+    const asset = result.canceled ? null : result.assets?.[0];
+
+    if (!asset) {
+      return;
+    }
+
+    await sendImageMessage(
+      asset.uri,
+      asset.fileName ?? `photo-${Date.now()}.jpg`,
+      asset.mimeType ?? "image/jpeg",
+      asset.fileSize ?? null,
+    );
+  }
+
+  async function handlePickFromFiles() {
+    setAttachMenuVisible(false);
+
+    // Restricted to images (rather than any file type) because the
+    // backend's chat image endpoint only accepts jpg/jpeg/png/webp — see
+    // chat-image-upload.middleware.ts. Offering PDFs or other documents
+    // here would let someone pick a file that's guaranteed to be
+    // rejected server-side.
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "image/*",
+      copyToCacheDirectory: true,
+    });
+
+    const asset = result.canceled ? null : result.assets?.[0];
+
+    if (!asset) {
+      return;
+    }
+
+    await sendImageMessage(
+      asset.uri,
+      asset.name,
+      asset.mimeType ?? "image/jpeg",
+      asset.size ?? null,
+    );
+  }
+
   async function makePhoneCall() {
     if (!isActive || isCalling) {
       return;
@@ -924,7 +1171,7 @@ export default function CustomerChatScreen() {
   |--------------------------------------------------------------------------
   */
 
-  function startFreeCall() {
+  function startFreeCall(callType: CallMediaType = "audio") {
     const socket = socketRef.current;
 
     if (!socket || !socket.connected) {
@@ -948,12 +1195,14 @@ export default function CustomerChatScreen() {
     setCallMenuVisible(false);
     setErrorMessage("");
     updateFreeCallStatus("starting");
+    activeCallTypeRef.current = callType;
+    setActiveCallType(callType);
 
     socket.emit(
       "call:start",
       {
         bookingId,
-        callType: "audio",
+        callType,
       },
       (result: StartCallCallback) => {
         if (!result?.ok) {
@@ -1013,6 +1262,8 @@ export default function CustomerChatScreen() {
 
         updateFreeCallStatus("accepted");
         setErrorMessage("");
+
+        void webrtc.startAsCallee(activeCallTypeRef.current);
       },
     );
   }
@@ -1059,6 +1310,8 @@ export default function CustomerChatScreen() {
     const socket = socketRef.current;
     const callId = activeCallIdRef.current;
 
+    webrtc.endCall();
+
     if (!callId) {
       resetFreeCall();
       return;
@@ -1098,30 +1351,46 @@ export default function CustomerChatScreen() {
       );
     }
 
+    const isImageMessage = item.message_type === "image" && item.image_url;
+
+    const resolvedImageUrl = isImageMessage
+      ? getImageUrl(item.image_url)
+      : null;
+
     return (
       <View className={`mb-3 px-4 ${isCustomer ? "items-end" : "items-start"}`}>
         <View
-          className={`max-w-[82%] rounded-2xl px-4 py-3 ${
-            isCustomer ? "rounded-br-md bg-primary" : "rounded-bl-md bg-white"
-          }`}
+          className={`max-w-[82%] overflow-hidden rounded-2xl ${
+            isImageMessage ? "" : "px-4 py-3"
+          } ${isCustomer ? "rounded-br-md bg-primary" : "rounded-bl-md bg-white"}`}
         >
-          <Text
-            className={`text-base leading-6 ${
-              isCustomer ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {item.message_text ?? ""}
-          </Text>
+          {resolvedImageUrl ? (
+            <Pressable onPress={() => setPreviewImageUrl(resolvedImageUrl)}>
+              <Image
+                source={{ uri: resolvedImageUrl }}
+                className="h-56 w-56 bg-gray-200"
+                resizeMode="cover"
+              />
+            </Pressable>
+          ) : (
+            <Text
+              className={`text-base leading-6 ${
+                isCustomer ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {item.message_text ?? ""}
+            </Text>
+          )}
 
           <View
             className={`mt-1 flex-row items-center ${
               isCustomer ? "justify-end" : "justify-start"
-            }`}
+            } ${isImageMessage ? "px-3 pb-2" : ""}`}
           >
             <Text
               className={`text-[11px] ${
-                isCustomer ? "text-white/80" : "text-gray-400"
-              }`}
+                isCustomer || isImageMessage ? "text-white/80" : "text-gray-400"
+              } ${isImageMessage && !isCustomer ? "text-gray-400" : ""}`}
             >
               {formatTime(item.created_at)}
             </Text>
@@ -1341,6 +1610,18 @@ export default function CustomerChatScreen() {
 
             {/* Input + Send */}
             <View className="flex-row items-end">
+              <Pressable
+                className="mr-2 h-12 w-12 items-center justify-center rounded-xl bg-gray-100"
+                onPress={() => setAttachMenuVisible(true)}
+                disabled={isUploadingImage}
+              >
+                {isUploadingImage ? (
+                  <ActivityIndicator color="#374151" />
+                ) : (
+                  <Paperclip size={20} color="#374151" />
+                )}
+              </Pressable>
+
               <TextInput
                 className="mr-2 max-h-28 min-h-12 flex-1 rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-base text-gray-900"
                 value={messageText}
@@ -1373,6 +1654,141 @@ export default function CustomerChatScreen() {
           </View>
         ) : null}
       </KeyboardAvoidingView>
+
+      {/* Attach options */}
+
+      <Modal
+        visible={attachMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAttachMenuVisible(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setAttachMenuVisible(false)}
+        >
+          <Pressable
+            className="rounded-t-3xl bg-white px-5 pb-8 pt-5"
+            onPress={() => {}}
+          >
+            <View className="mb-5 flex-row items-center justify-between">
+              <View className="flex-1 pr-4">
+                <Text className="text-xl font-bold text-gray-900">
+                  Send a photo
+                </Text>
+
+                <Text className="mt-1 text-sm text-gray-500">
+                  Choose where to get it from
+                </Text>
+              </View>
+
+              <Pressable
+                className="h-10 w-10 items-center justify-center rounded-full bg-gray-100"
+                onPress={() => setAttachMenuVisible(false)}
+              >
+                <X size={20} color="#374151" />
+              </Pressable>
+            </View>
+
+            <Pressable
+              className="mb-3 flex-row items-center rounded-2xl border border-gray-200 bg-white p-4"
+              onPress={() => {
+                void handlePickFromCamera();
+              }}
+            >
+              <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-primary">
+                <Camera size={22} color="#FFFFFF" />
+              </View>
+
+              <View className="flex-1">
+                <Text className="text-base font-bold text-gray-900">
+                  Camera
+                </Text>
+
+                <Text className="mt-1 text-sm text-gray-600">
+                  Take a new photo
+                </Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              className="mb-3 flex-row items-center rounded-2xl border border-gray-200 bg-white p-4"
+              onPress={() => {
+                void handlePickFromLibrary();
+              }}
+            >
+              <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-primary">
+                <ImageIcon size={22} color="#FFFFFF" />
+              </View>
+
+              <View className="flex-1">
+                <Text className="text-base font-bold text-gray-900">
+                  Photos
+                </Text>
+
+                <Text className="mt-1 text-sm text-gray-600">
+                  Choose from your photo library
+                </Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              className="flex-row items-center rounded-2xl border border-gray-200 bg-white p-4"
+              onPress={() => {
+                void handlePickFromFiles();
+              }}
+            >
+              <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-primary">
+                <File size={22} color="#FFFFFF" />
+              </View>
+
+              <View className="flex-1">
+                <Text className="text-base font-bold text-gray-900">Files</Text>
+
+                <Text className="mt-1 text-sm text-gray-600">
+                  Browse for an image file
+                </Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              className="mt-4 h-12 items-center justify-center rounded-xl bg-gray-100"
+              onPress={() => setAttachMenuVisible(false)}
+            >
+              <Text className="font-semibold text-gray-700">Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Full-size image preview */}
+
+      <Modal
+        visible={Boolean(previewImageUrl)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImageUrl(null)}
+      >
+        <Pressable
+          className="flex-1 items-center justify-center bg-black/90"
+          onPress={() => setPreviewImageUrl(null)}
+        >
+          {previewImageUrl ? (
+            <Image
+              source={{ uri: previewImageUrl }}
+              className="h-4/5 w-full"
+              resizeMode="contain"
+            />
+          ) : null}
+
+          <Pressable
+            className="absolute right-5 top-14 h-10 w-10 items-center justify-center rounded-full bg-white/20"
+            onPress={() => setPreviewImageUrl(null)}
+          >
+            <X size={22} color="#FFFFFF" />
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Call options */}
 
@@ -1409,9 +1825,30 @@ export default function CustomerChatScreen() {
               </Pressable>
             </View>
 
+            {booking?.can_start_video_consultation ? (
+              <Pressable
+                className="mb-3 flex-row items-center rounded-2xl border border-primary/30 bg-primary/5 p-4"
+                onPress={() => startFreeCall("video")}
+              >
+                <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-primary">
+                  <Video size={22} color="#FFFFFF" />
+                </View>
+
+                <View className="flex-1">
+                  <Text className="text-base font-bold text-gray-900">
+                    Video Consultation
+                  </Text>
+
+                  <Text className="mt-1 text-sm text-gray-600">
+                    Show your provider the issue over video
+                  </Text>
+                </View>
+              </Pressable>
+            ) : null}
+
             <Pressable
               className="mb-3 flex-row items-center rounded-2xl border border-green-200 bg-green-50 p-4"
-              onPress={startFreeCall}
+              onPress={() => startFreeCall("audio")}
             >
               <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-green-600">
                 <Wifi size={22} color="#FFFFFF" />
@@ -1529,46 +1966,116 @@ export default function CustomerChatScreen() {
         animationType="fade"
         onRequestClose={endFreeCall}
       >
-        <View className="flex-1 items-center justify-center bg-black/70 px-6">
-          <View className="w-full max-w-sm items-center rounded-3xl bg-white px-6 py-8">
-            <View className="h-20 w-20 items-center justify-center rounded-full bg-green-100">
-              {freeCallStatus === "starting" ? (
-                <ActivityIndicator size="large" color="#16A34A" />
-              ) : (
-                <Phone size={34} color="#16A34A" />
-              )}
-            </View>
+        {activeCallType === "video" && freeCallStatus === "accepted" ? (
+          <View className="flex-1 bg-black">
+            {webrtc.remoteStream ? (
+              <RTCView
+                streamURL={webrtc.remoteStream.toURL()}
+                style={{ flex: 1 }}
+                objectFit="cover"
+              />
+            ) : (
+              <View className="flex-1 items-center justify-center">
+                <ActivityIndicator size="large" color="#FFFFFF" />
 
-            <Text className="mt-5 text-xl font-bold text-gray-900">
-              {providerName}
-            </Text>
-
-            <Text className="mt-2 text-center text-sm text-gray-500">
-              {freeCallStatus === "starting"
-                ? "Starting Free Call..."
-                : freeCallStatus === "ringing"
-                  ? "Calling provider..."
-                  : "Provider accepted"}
-            </Text>
-
-            {freeCallStatus === "accepted" && (
-              <Text className="mt-2 text-center text-xs text-gray-400">
-                Audio connection will be enabled in the next WebRTC step.
-              </Text>
+                <Text className="mt-4 text-sm text-white/80">
+                  Connecting video...
+                </Text>
+              </View>
             )}
 
-            <Pressable
-              className="mt-8 h-16 w-16 items-center justify-center rounded-full bg-red-600"
-              onPress={endFreeCall}
-            >
-              <PhoneOff size={28} color="#FFFFFF" />
-            </Pressable>
+            {webrtc.localStream && webrtc.isVideoEnabled ? (
+              <View className="absolute right-4 top-14 h-40 w-28 overflow-hidden rounded-2xl border-2 border-white/30 bg-gray-800">
+                <RTCView
+                  streamURL={webrtc.localStream.toURL()}
+                  style={{ flex: 1 }}
+                  objectFit="cover"
+                  mirror
+                  zOrder={1}
+                />
+              </View>
+            ) : null}
 
-            <Text className="mt-3 text-sm font-semibold text-red-600">
-              {freeCallStatus === "accepted" ? "End Call" : "Cancel"}
-            </Text>
+            <View className="absolute bottom-12 w-full flex-row items-center justify-center gap-5">
+              <Pressable
+                className={`h-14 w-14 items-center justify-center rounded-full ${
+                  webrtc.isMuted ? "bg-white" : "bg-white/20"
+                }`}
+                onPress={webrtc.toggleMute}
+              >
+                <Text className={webrtc.isMuted ? "text-black" : "text-white"}>
+                  {webrtc.isMuted ? "Unmute" : "Mute"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                className="h-16 w-16 items-center justify-center rounded-full bg-red-600"
+                onPress={endFreeCall}
+              >
+                <PhoneOff size={26} color="#FFFFFF" />
+              </Pressable>
+
+              <Pressable
+                className={`h-14 w-14 items-center justify-center rounded-full ${
+                  !webrtc.isVideoEnabled ? "bg-white" : "bg-white/20"
+                }`}
+                onPress={webrtc.toggleVideo}
+              >
+                <Text
+                  className={
+                    !webrtc.isVideoEnabled ? "text-black" : "text-white"
+                  }
+                >
+                  {webrtc.isVideoEnabled ? "Video" : "Off"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                className="h-14 w-14 items-center justify-center rounded-full bg-white/20"
+                onPress={webrtc.switchCamera}
+              >
+                <Text className="text-white">Flip</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        ) : (
+          <View className="flex-1 items-center justify-center bg-black/70 px-6">
+            <View className="w-full max-w-sm items-center rounded-3xl bg-white px-6 py-8">
+              <View className="h-20 w-20 items-center justify-center rounded-full bg-green-100">
+                {freeCallStatus === "starting" ? (
+                  <ActivityIndicator size="large" color="#16A34A" />
+                ) : (
+                  <Phone size={34} color="#16A34A" />
+                )}
+              </View>
+
+              <Text className="mt-5 text-xl font-bold text-gray-900">
+                {providerName}
+              </Text>
+
+              <Text className="mt-2 text-center text-sm text-gray-500">
+                {freeCallStatus === "starting"
+                  ? "Starting call..."
+                  : freeCallStatus === "ringing"
+                    ? "Calling provider..."
+                    : webrtc.connectionState === "connected"
+                      ? "Connected"
+                      : "Connecting audio..."}
+              </Text>
+
+              <Pressable
+                className="mt-8 h-16 w-16 items-center justify-center rounded-full bg-red-600"
+                onPress={endFreeCall}
+              >
+                <PhoneOff size={28} color="#FFFFFF" />
+              </Pressable>
+
+              <Text className="mt-3 text-sm font-semibold text-red-600">
+                {freeCallStatus === "accepted" ? "End Call" : "Cancel"}
+              </Text>
+            </View>
+          </View>
+        )}
       </Modal>
     </SafeAreaView>
   );

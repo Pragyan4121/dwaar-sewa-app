@@ -28,10 +28,21 @@ export interface Service {
   name: string;
   description: string | null;
   base_price: string;
+  video_consultation_price?: string | null;
   duration_minutes: number | null;
   is_active: boolean;
   category_id: number;
   service_categories: ServiceCategory;
+}
+
+export type BookingType = "home_visit" | "video_consultation";
+
+export interface ConsultationCredit {
+  id: number;
+  consultation_booking_id: number;
+  credit_amount: number;
+  expires_at: string;
+  created_at: string;
 }
 
 export interface CreateBookingPayload {
@@ -42,6 +53,8 @@ export interface CreateBookingPayload {
   preferredTime?: string;
   notes?: string;
   paymentMethod?: PaymentMethod;
+  bookingType?: BookingType;
+  consultationCreditId?: number;
 }
 
 export type PaymentMethod = "cash" | "esewa" | "khalti" | "connectips";
@@ -392,6 +405,8 @@ export interface ProviderBooking {
   payment_method: PaymentMethod;
   estimated_price: string | number | null;
   final_price?: string | number | null;
+  booking_type?: string;
+  consultation_outcome?: string | null;
   accepted_at?: string | null;
   assigned_at?: string | null;
   started_at?: string | null;

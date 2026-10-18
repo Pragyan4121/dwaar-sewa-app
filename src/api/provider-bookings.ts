@@ -110,3 +110,13 @@ export async function confirmProviderCashPaymentReceived(bookingId: number) {
 
   return data;
 }
+
+export async function setConsultationOutcome(
+  bookingId: number,
+  outcome: "resolved" | "needs_visit",
+): Promise<void> {
+  await providerApi.patch(
+    `/bookings/provider/${bookingId}/consultation-outcome`,
+    { outcome },
+  );
+}

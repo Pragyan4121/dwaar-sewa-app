@@ -834,6 +834,14 @@ export default function ProviderBookingsScreen() {
                             <Text className="text-[9px] font-extrabold tracking-[1px] text-[#94A3B8]">
                               JOB #{booking.id}
                             </Text>
+
+                            {booking.booking_type === "video_consultation" ? (
+                              <View className="ml-2 rounded-full bg-[#EEF4FF] px-2 py-0.5">
+                                <Text className="text-[8px] font-extrabold tracking-wide text-[#3563E9]">
+                                  VIDEO
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
 
                           <Text className="mt-1 text-[17px] font-extrabold text-[#132F57]">
