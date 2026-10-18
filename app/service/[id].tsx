@@ -260,6 +260,13 @@ export default function ServiceDetailScreen() {
     }
   }, [bookingType, paymentMethod]);
 
+  // Promo codes don't apply to video consultations.
+  useEffect(() => {
+    if (bookingType === "video_consultation" && promoCode) {
+      setPromoCode("");
+    }
+  }, [bookingType, promoCode]);
+
   const [availableCredits, setAvailableCredits] = useState<
     ConsultationCredit[]
   >([]);
@@ -463,9 +470,10 @@ export default function ServiceDetailScreen() {
         isAsap: isAsap || undefined,
         notes: notes || undefined,
         paymentMethod,
-        promoCode: promoCode.trim()
-          ? promoCode.trim().toUpperCase()
-          : undefined,
+        promoCode:
+          bookingType !== "video_consultation" && promoCode.trim()
+            ? promoCode.trim().toUpperCase()
+            : undefined,
         bookingType,
         consultationCreditId:
           bookingType === "home_visit" && selectedCreditId
@@ -1317,48 +1325,55 @@ export default function ServiceDetailScreen() {
                       );
                     })}
                   </View>
-                  {/* PROMO CODE */}
-                  <View className="flex-row items-center mb-3">
-                    <View className="w-9 h-9 rounded-xl bg-[#FFF3EE] items-center justify-center">
-                      <Tag size={17} color="#FF5A3C" />
-                    </View>
+                  {bookingType !== "video_consultation" ? (
+                    <>
+                      {/* PROMO CODE */}
+                      <View className="flex-row items-center mb-3">
+                        <View className="w-9 h-9 rounded-xl bg-[#FFF3EE] items-center justify-center">
+                          <Tag size={17} color="#FF5A3C" />
+                        </View>
 
-                    <View className="ml-2.5">
-                      <Text className="text-secondary text-sm font-extrabold">
-                        Promo code
-                      </Text>
+                        <View className="ml-2.5">
+                          <Text className="text-secondary text-sm font-extrabold">
+                            Promo code
+                          </Text>
 
-                      <Text className="text-muted text-[10px] mt-0.5">
-                        Optional discount code
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View className="mb-5">
-                    <TextInput
-                      value={promoCode}
-                      onChangeText={(value) =>
-                        setPromoCode(
-                          value.toUpperCase().replace(/\s+/g, "").slice(0, 50),
-                        )
-                      }
-                      placeholder="Enter promo code"
-                      placeholderTextColor="#94A3B8"
-                      autoCapitalize="characters"
-                      autoCorrect={false}
-                      className="bg-[#FAFBFC] border border-[#E2E8F0] rounded-2xl px-4 py-3.5 text-secondary"
-                    />
-
-                    {promoCode.trim() ? (
-                      <View className="flex-row items-center mt-2">
-                        <CheckCircle2 size={14} color="#159A64" />
-
-                        <Text className="text-[#159A64] text-[10px] font-semibold ml-1.5">
-                          {promoCode.trim().toUpperCase()} will be applied
-                        </Text>
+                          <Text className="text-muted text-[10px] mt-0.5">
+                            Optional discount code
+                          </Text>
+                        </View>
                       </View>
-                    ) : null}
-                  </View>
+
+                      <View className="mb-5">
+                        <TextInput
+                          value={promoCode}
+                          onChangeText={(value) =>
+                            setPromoCode(
+                              value
+                                .toUpperCase()
+                                .replace(/\s+/g, "")
+                                .slice(0, 50),
+                            )
+                          }
+                          placeholder="Enter promo code"
+                          placeholderTextColor="#94A3B8"
+                          autoCapitalize="characters"
+                          autoCorrect={false}
+                          className="bg-[#FAFBFC] border border-[#E2E8F0] rounded-2xl px-4 py-3.5 text-secondary"
+                        />
+
+                        {promoCode.trim() ? (
+                          <View className="flex-row items-center mt-2">
+                            <CheckCircle2 size={14} color="#159A64" />
+
+                            <Text className="text-[#159A64] text-[10px] font-semibold ml-1.5">
+                              {promoCode.trim().toUpperCase()} will be applied
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </>
+                  ) : null}
 
                   {/* NOTES */}
                   <Text className="text-secondary text-sm font-extrabold mb-1.5">
